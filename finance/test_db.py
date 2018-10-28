@@ -77,14 +77,21 @@ class TestSchema(unittest.TestCase):
 
 
 class TestViews(unittest.TestCase):
-    _TRANSACTIONS = []
+    _TRANSACTIONS = [
+        ('2018-01-04 13:00', '490', 'Panini Paradise', 'Food', 'Snack', '', 'Delicious'),
+        ('2018-01-04 20:00', '3100', 'Generico Supermarket', 'Food', 'Groceries', '', ''),
+        ('2018-01-05 13:20', '490', 'Panini Paradise', '', '', '', ''),
+    ]
 
     def setUp(self):
         self.db = Connection(':memory:', 'password')
         self.db.connect()
         for tx_data in TestViews._TRANSACTIONS:
+            tx_data = list(tx_data)
+            tx_data[0] = datetime.datetime.strptime(tx_data[0], '%Y-%m-%d %H:%M')
             tx_data[1], tx_data[2] = tx_data[2], tx_data[1]
-            tx = Transaction(*tx_data)
+            tx_data = [None] + tx_data
+            tx = Transaction(*tuple(tx_data))
             self.db.store_transaction(tx)
 
     def tearDown(self):
@@ -93,6 +100,10 @@ class TestViews(unittest.TestCase):
     def test_all_filter(self):
         v = self.db.filter(Filter.all())
         self.assertEqual(len(TestViews._TRANSACTIONS), len(v))
+
+    def test_description_contains(self):
+        v = self.db.filter(Filter.description_contains('Panini'))
+        self.assertEqual(2, len(v))
 
 
 def new_db(path, key):

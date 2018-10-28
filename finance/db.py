@@ -102,9 +102,10 @@ class Connection(object):
         else:
             self._update_transaction(tx)
 
-    def fetch_transactions(self, query, params):
+    def fetch_transactions(self, condition, params):
         with self._safe_cursor() as c:
-            qs = c.execute('SELECT * FROM transactions WHERE %s' % query, params)
+            query = 'SELECT * from transactions WHERE {}'.format(condition)
+            qs = c.execute(query, params)
             for row in qs:
                 yield self._deserialize_transaction(row)
 
@@ -150,7 +151,7 @@ class View(object):
             self.filter_params = filter_data[1]
         elif isinstance(parent, View):
             self.db = parent.db
-            self.filter_str = '%s AND %s' % (parent.filter_str, filter_data[0])
+            self.filter_str = '{} AND {}'.format(parent.filter_str, filter_data[0])
             self.filter_params = parent.filter_params + filter_data[1]
         else:
             raise ValueError('Unexpected type %s', str(parent.__class__))
@@ -163,9 +164,13 @@ class View(object):
 
 
 class Filter(object):
-    @classmethod
-    def all(_):
+    @staticmethod
+    def all():
         return ('1', ())
+
+    @staticmethod
+    def description_contains(substr):
+        return ('description LIKE "%" || ? || "%"', (substr,))
 
 
 class SchemaMismatch(Exception):
