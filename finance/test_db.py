@@ -81,6 +81,7 @@ class TestViews(unittest.TestCase):
         ('2018-01-04 13:00', '490', 'Panini Paradise', 'Food', 'Snack', '', 'Delicious'),
         ('2018-01-04 20:00', '3100', 'Generico Supermarket', 'Food', 'Groceries', '', ''),
         ('2018-01-05 13:20', '490', 'Panini Paradise', '', '', '', ''),
+        ('2018-01-06 21:00', '799', 'Webflix', 'Entertainment', 'Movies', 'Streaming', ''),
         ('2018-01-07 15:00', '6249', 'Generico Supermarket', 'Food', 'Groceries', 'Occasion', ''),
     ]
 
@@ -121,6 +122,23 @@ class TestViews(unittest.TestCase):
     def test_category_match_filter_on_category_3(self):
         v = self.db.filter(Filter.category(('Food', 'Groceries', 'Occasion')))
         self.assertEqual(1, len(v))
+
+    def test_date_range_filter(self):
+        v = self.db.filter(Filter.date_range(
+            datetime.datetime.strptime('2018-01-05 00:00', '%Y-%m-%d %H:%M'),
+            datetime.datetime.strptime('2018-01-06 23:59', '%Y-%m-%d %H:%M'),
+        ))
+        self.assertEqual(2, len(v))
+
+    def test_date_after_filter(self):
+        v = self.db.filter(Filter.date_after(
+            datetime.datetime.strptime('2018-01-04 13:01', '%Y-%m-%d %H:%M')))
+        self.assertEqual(len(TestViews._TRANSACTIONS) - 1, len(v))
+
+    def test_date_before_filter(self):
+        v = self.db.filter(Filter.date_before(
+            datetime.datetime.strptime('2018-01-04 20:01', '%Y-%m-%d %H:%M')))
+        self.assertEqual(2, len(v))
 
 
 def new_db(path, key):

@@ -184,6 +184,23 @@ class Filter(object):
         query = ' AND '.join(query_parts)
         return (query, categories)
 
+    @staticmethod
+    def date_range(start_incl, end_incl):
+        start_epoch = _datetime_to_epoch(start_incl)
+        end_epoch = _datetime_to_epoch(end_incl)
+        query = 'timestamp >= ? AND timestamp <= ?'
+        return (query, (start_epoch, end_epoch))
+
+    @staticmethod
+    def date_before(start_incl):
+        start_epoch = _datetime_to_epoch(start_incl)
+        return ('timestamp <= ?', (start_epoch,))
+
+    @staticmethod
+    def date_after(end_incl):
+        end_epoch = _datetime_to_epoch(end_incl)
+        return ('timestamp >= ?', (end_epoch,))
+
 
 class SchemaMismatch(Exception):
     def __init__(self, expected, actual):
