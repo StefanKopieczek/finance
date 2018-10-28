@@ -1,14 +1,18 @@
 import curses
+import textwrap
 
 
 class Ui(object):
     def __init__(self):
         self.screen = None
         self.title_win = None
-        self.display_win = None
+        self.display_pad = None
         self.input_win = None
         self.input_buffer = ''
         self.cursor_offset = 0
+        self.display_bounds = (None, None, None, None)
+        self.display_scroll = 0
+        self.display_current_line = 0
 
     def run(self, stdscr):
         self.screen = stdscr
@@ -33,7 +37,9 @@ class Ui(object):
         title_win.refresh()
         self.title_win = title_win
 
-        self.display_win = curses.newwin(display_height, max_width, title_height, 0)
+        self.display_pad = curses.newpad(10000, max_width)
+        self.display_bounds = (title_height, 0, display_height + title_height, max_width)
+        self.display_current_line = display_height - 1
 
         self.input_win = curses.newwin(input_height, max_width, title_height + display_height, 0)
         self.repaint_input_win()
@@ -71,10 +77,25 @@ class Ui(object):
         return should_continue
 
     def handle_command(self, command):
-        if command.lower() == 'exit':
+        cmd = command.lower()
+        if cmd == 'exit':
             return False
+        elif cmd == 'testlong':
+            self.write_line('abc' * 600)
         else:
-            return True
+            self.write_line('Cannot parse command: {}'.format(command))
+        return True
+
+    def write_line(self, line):
+        lines = textwrap.wrap(line, width=curses.COLS)
+        if len(lines) > 1:
+            # If the line got wrapped, append an extra newline
+            lines += ['']
+        for line in lines:
+            self.display_pad.addstr(self.display_current_line, 1, line)
+            self.display_scroll += 1
+            self.display_current_line += 1
+        self.repaint_display_pad()
 
     def repaint_input_win(self):
         w = self.input_win
@@ -87,6 +108,11 @@ class Ui(object):
         w.addstr(1, 6 + cursor_pos, '_', curses.A_BLINK)
         w.addstr(1, 6 + cursor_pos + 1, buf[cursor_pos:])
         w.refresh()
+
+    def repaint_display_pad(self):
+        top, left, bottom, right = self.display_bounds
+        scroll = self.display_scroll
+        self.display_pad.refresh(scroll, 0, top, left, bottom, right)
 
 
 if __name__ == '__main__':
