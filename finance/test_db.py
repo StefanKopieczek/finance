@@ -106,6 +106,10 @@ class TestViews(unittest.TestCase):
         v = self.db.filter(Filter.description('Panini'))
         self.assertEqual(2, len(v))
 
+    def test_description_filter_is_case_insensitive(self):
+        v = self.db.filter(Filter.description('panini'))
+        self.assertEqual(2, len(v))
+
     def test_category_match_filter_on_category_1(self):
         v = self.db.filter(Filter.category(('Food',)))
         self.assertEqual(3, len(v))
