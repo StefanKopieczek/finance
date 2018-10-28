@@ -81,6 +81,7 @@ class TestViews(unittest.TestCase):
         ('2018-01-04 13:00', '490', 'Panini Paradise', 'Food', 'Snack', '', 'Delicious'),
         ('2018-01-04 20:00', '3100', 'Generico Supermarket', 'Food', 'Groceries', '', ''),
         ('2018-01-05 13:20', '490', 'Panini Paradise', '', '', '', ''),
+        ('2018-01-07 15:00', '6249', 'Generico Supermarket', 'Food', 'Groceries', 'Occasion', ''),
     ]
 
     def setUp(self):
@@ -101,9 +102,21 @@ class TestViews(unittest.TestCase):
         v = self.db.filter(Filter.all())
         self.assertEqual(len(TestViews._TRANSACTIONS), len(v))
 
-    def test_description_contains(self):
+    def test_description_contains_filter(self):
         v = self.db.filter(Filter.description_contains('Panini'))
         self.assertEqual(2, len(v))
+
+    def test_category_match_filter_on_category_1(self):
+        v = self.db.filter(Filter.category(('Food',)))
+        self.assertEqual(3, len(v))
+
+    def test_category_match_filter_on_category_2(self):
+        v = self.db.filter(Filter.category(('Food', 'Groceries')))
+        self.assertEqual(2, len(v))
+
+    def test_category_match_filter_on_category_3(self):
+        v = self.db.filter(Filter.category(('Food', 'Groceries', 'Occasion')))
+        self.assertEqual(1, len(v))
 
 
 def new_db(path, key):

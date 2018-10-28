@@ -172,6 +172,18 @@ class Filter(object):
     def description_contains(substr):
         return ('description LIKE "%" || ? || "%"', (substr,))
 
+    @staticmethod
+    def category(categories):
+        query_parts = ['category_1=?']
+        if len(categories) > 1:
+            query_parts.append('category_2=?')
+        if len(categories) > 2:
+            query_parts.append('category_3=?')
+        if len(categories) > 3:
+            raise ValueError('Invalid category filter "{}" - max 3 categories allowed'.format(categories))
+        query = ' AND '.join(query_parts)
+        return (query, categories)
+
 
 class SchemaMismatch(Exception):
     def __init__(self, expected, actual):
