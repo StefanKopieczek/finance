@@ -1,39 +1,94 @@
 import curses
-import time
 
 
-def main(stdscr):
-    display_win, input_win = init_ui(stdscr)
-    time.sleep(5)
+class Ui(object):
+    def __init__(self):
+        self.screen = None
+        self.title_win = None
+        self.display_win = None
+        self.input_win = None
+        self.input_buffer = ''
+        self.cursor_offset = 0
 
+    def run(self, stdscr):
+        self.screen = stdscr
+        self.init_ui()
+        while self.handle_input():
+            pass
 
-def init_ui(stdscr):
-    max_width = curses.COLS
-    max_height = curses.LINES
+    def init_ui(self):
+        self.screen.refresh()
+        max_width = curses.COLS
+        max_height = curses.LINES
 
-    title_height = int(max_height * 0.1)
-    input_height = int((max_height - title_height) * 0.10)
-    display_height = max_height - (title_height + input_height)
+        title_height = int(max_height * 0.1)
+        input_height = int((max_height - title_height) * 0.10)
+        display_height = max_height - (title_height + input_height)
 
-    title_win = curses.newwin(title_height, max_width, 0, 0)
-    title_str = "STEFAN'S PATENTED FINANCIAL PLANNER"
-    title_x = int(max_width / 2 - len(title_str) / 2)
-    title_win.border(0, 0, 0, 0)
-    title_win.addstr(1, title_x, "STEFAN'S PATENTED FINANCIAL PLANNER", curses.A_BOLD + curses.A_UNDERLINE)
-    title_win.refresh()
+        title_win = curses.newwin(title_height, max_width, 0, 0)
+        title_str = "STEFAN'S PATENTED FINANCIAL PLANNER"
+        title_x = int(max_width / 2 - len(title_str) / 2)
+        title_win.border(0, 0, 0, 0)
+        title_win.addstr(1, title_x, "STEFAN'S PATENTED FINANCIAL PLANNER", curses.A_BOLD + curses.A_UNDERLINE)
+        title_win.refresh()
+        self.title_win = title_win
 
-    display_win = curses.newwin(display_height, max_width, title_height, 0)
+        self.display_win = curses.newwin(display_height, max_width, title_height, 0)
 
-    input_win = curses.newwin(input_height, max_width, title_height + display_height, 0)
-    input_win.border(' ', ' ', curses.ACS_HLINE, ' ')
-    input_win.addstr(1, 4, '>', curses.A_BOLD)
-    input_win.addstr(1, 6, '_', curses.A_BLINK)
-    input_win.refresh()
+        self.input_win = curses.newwin(input_height, max_width, title_height + display_height, 0)
+        self.repaint_input_win()
 
-    curses.curs_set(0)
+        curses.curs_set(0)
 
-    return display_win, input_win
+    def handle_input(self):
+        should_continue = True
+        c = self.screen.getch()
+        if 32 <= c <= 126:
+            self.input_buffer = self.input_buffer[:self.cursor_offset] + chr(c) + self.input_buffer[self.cursor_offset:]
+            self.cursor_offset += 1
+        elif c == curses.KEY_LEFT:
+            if self.cursor_offset >= 0:
+                self.cursor_offset -= 1
+            else:
+                curses.beep()
+        elif c == curses.KEY_RIGHT:
+            if self.cursor_offset < len(self.input_buffer):
+                self.cursor_offset += 1
+            else:
+                curses.beep()
+        elif c == curses.KEY_BACKSPACE:
+            self.input_buffer = self.input_buffer[:self.cursor_offset - 1] + self.input_buffer[self.cursor_offset:]
+            self.cursor_offset -= 1
+        elif c == curses.KEY_ENTER or c == 10 or c == 13:
+            command = self.input_buffer
+            self.input_buffer = ''
+            self.cursor_offset = 0
+            should_continue = self.handle_command(command)
+        else:
+            return False
+
+        self.repaint_input_win()
+        return should_continue
+
+    def handle_command(self, command):
+        if command.lower() == 'exit':
+            return False
+        else:
+            return True
+
+    def repaint_input_win(self):
+        w = self.input_win
+        buf = self.input_buffer
+        cursor_pos = self.cursor_offset
+        w.clear()
+        w.border(' ', ' ', curses.ACS_HLINE, ' ')
+        w.addstr(1, 4, '>', curses.A_BOLD)
+        w.addstr(1, 6, buf[:cursor_pos])
+        w.addstr(1, 6 + cursor_pos, '_', curses.A_BLINK)
+        w.addstr(1, 6 + cursor_pos + 1, buf[cursor_pos:])
+        w.refresh()
 
 
 if __name__ == '__main__':
-    curses.wrapper(main)
+    ui = Ui()
+    curses.wrapper(ui.run)
