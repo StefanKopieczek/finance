@@ -2,8 +2,7 @@ import datetime
 import os
 import unittest
 from contextlib import closing
-from .api import Transaction
-from .db import Connection, Filter
+from .backend_context import Connection, Filter, Transaction
 
 
 class TestDb(unittest.TestCase):
