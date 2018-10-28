@@ -169,7 +169,7 @@ class Filter(object):
         return ('1', ())
 
     @staticmethod
-    def description_contains(substr):
+    def description(substr):
         return ('description LIKE "%" || ? || "%"', (substr,))
 
     @staticmethod

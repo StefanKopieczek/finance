@@ -102,8 +102,8 @@ class TestViews(unittest.TestCase):
         v = self.db.filter(Filter.all())
         self.assertEqual(len(TestViews._TRANSACTIONS), len(v))
 
-    def test_description_contains_filter(self):
-        v = self.db.filter(Filter.description_contains('Panini'))
+    def test_description_filter(self):
+        v = self.db.filter(Filter.description('Panini'))
         self.assertEqual(2, len(v))
 
     def test_category_match_filter_on_category_1(self):
