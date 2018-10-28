@@ -3,7 +3,7 @@ import os
 import unittest
 from contextlib import closing
 from .api import Transaction
-from .db import Connection
+from .db import Connection, View, Filter
 
 
 class TestDb(unittest.TestCase):
@@ -74,6 +74,25 @@ class TestSchema(unittest.TestCase):
             self.assertIsNotNone(tx.tid)
             stored_id = next(db.fetch_transactions("1", ())).tid
             self.assertEqual(tx.tid, stored_id)
+
+
+class TestViews(unittest.TestCase):
+    _TRANSACTIONS = []
+
+    def setUp(self):
+        self.db = Connection(':memory:', 'password')
+        self.db.connect()
+        for tx_data in TestViews._TRANSACTIONS:
+            tx_data[1], tx_data[2] = tx_data[2], tx_data[1]
+            tx = Transaction(*tx_data)
+            self.db.store_transaction(tx)
+
+    def tearDown(self):
+        self.db.close()
+
+    def test_all_filter(self):
+        v = View(self.db, Filter.all())
+        self.assertEqual(len(TestViews._TRANSACTIONS), len(v))
 
 
 def new_db(path, key):
