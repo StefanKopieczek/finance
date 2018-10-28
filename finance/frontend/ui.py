@@ -80,16 +80,16 @@ class Ui(object):
         cmd = command.lower()
         if cmd == 'exit':
             return False
-        elif cmd == 'testlong':
-            self.write_line('abc' * 600)
+        elif len(cmd.strip()) == 0:
+            self.write_line(' ')
         else:
             self.write_line('Cannot parse command: {}'.format(command))
         return True
 
     def write_line(self, line):
         lines = textwrap.wrap(line, width=curses.COLS)
-        if len(lines) > 1:
-            # If the line got wrapped, append an extra newline
+        if len(lines) != 1:
+            # If the line got wrapped, or was blank, append an extra newline
             lines += ['']
         for line in lines:
             self.display_pad.addstr(self.display_current_line, 1, line)
