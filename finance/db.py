@@ -138,6 +138,9 @@ class Connection(object):
         tx.timestamp = _epoch_to_datetime(tx.timestamp)
         return tx
 
+    def filter(self, criterion):
+        return View(self, criterion)
+
 
 class View(object):
     def __init__(self, parent, filter_data):

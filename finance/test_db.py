@@ -3,7 +3,7 @@ import os
 import unittest
 from contextlib import closing
 from .api import Transaction
-from .db import Connection, View, Filter
+from .db import Connection, Filter
 
 
 class TestDb(unittest.TestCase):
@@ -91,7 +91,7 @@ class TestViews(unittest.TestCase):
         self.db.close()
 
     def test_all_filter(self):
-        v = View(self.db, Filter.all())
+        v = self.db.filter(Filter.all())
         self.assertEqual(len(TestViews._TRANSACTIONS), len(v))
 
 
