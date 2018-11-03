@@ -12,6 +12,7 @@ class Ui(object):
         self.cursor_offset = 0
         self.display_bounds = (None, None, None, None)
         self.display_scroll = 0
+        self.display_max_scroll = 0
         self.display_current_line = 0
 
     def run(self, stdscr):
@@ -65,10 +66,17 @@ class Ui(object):
         elif c == curses.KEY_BACKSPACE:
             self.input_buffer = self.input_buffer[:self.cursor_offset - 1] + self.input_buffer[self.cursor_offset:]
             self.cursor_offset -= 1
+        elif c == curses.KEY_UP:
+            self.display_scroll = max(self.display_scroll - 1, 0)
+            self.repaint_display_pad()
+        elif c == curses.KEY_DOWN:
+            self.display_scroll = min(self.display_scroll + 1, self.display_max_scroll)
+            self.repaint_display_pad()
         elif c == curses.KEY_ENTER or c == 10 or c == 13:
             command = self.input_buffer
             self.input_buffer = ''
             self.cursor_offset = 0
+            self.display_scroll = self.display_max_scroll
             should_continue = self.handle_command(command)
         else:
             return False
@@ -95,6 +103,7 @@ class Ui(object):
             self.display_pad.addstr(self.display_current_line, 1, line)
             self.display_scroll += 1
             self.display_current_line += 1
+            self.display_max_scroll += 1
         self.repaint_display_pad()
 
     def repaint_input_win(self):
