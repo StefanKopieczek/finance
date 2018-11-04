@@ -95,12 +95,8 @@ class Ui(object):
         return continue_running
 
     def handle_global_command(self, command):
-        if command == 'exit':
+        if command == 'exit' or command == 'quit':
             return True, False
-        elif command.startswith('testsplit '):
-            num_panes = int(command.split()[1])
-            self.refresh_view_panes([None] * num_panes)
-            return True, True
         else:
             return False, True
 
@@ -232,9 +228,6 @@ class ViewPane(object):
     def handle_command(self, command):
         if len(command) == 0:
             self.write_line(' ')
-        elif command == 'testtext':
-            self.window.addstr(10, 10, "foo")
-            self.window.refresh()
         else:
             self.write_line('Cannot parse command: {}'.format(command))
 
