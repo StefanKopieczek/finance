@@ -183,7 +183,10 @@ class View(object):
         return self.db.fetch_transactions(self.filter_str, self.filter_params)
 
     def __len__(self):
-        return sum(1 for _ in self)
+        try:
+            return sum(1 for _ in self)
+        except sqlcipher.InterfaceError as e:
+            raise Exception('{} with {}'.format(self.filter_str, self.filter_params), e)
 
     def filter(self, criterion):
         return View(self, criterion)
