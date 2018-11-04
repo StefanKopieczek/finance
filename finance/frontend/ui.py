@@ -1,6 +1,7 @@
 import curses
 import textwrap
 import time
+from collections import defaultdict
 from ..backend import Filter
 
 
@@ -294,7 +295,8 @@ class ViewPane(object):
                 term = term[1:-1]
                 self.db_context = self.db_context.filter(Filter.description(term))
                 self.print_filter_status()
-
+        elif command == 'summary':
+            self.summary()
         elif command == 'reset':
             self.db_context = self.original_db_context
             self.write_line('=> Showing {} total transactions'.format(len(self.db_context)))
@@ -309,6 +311,30 @@ class ViewPane(object):
 
     def print_filter_status(self):
         self.write_line('=> Filtered down to {} transactions'.format(len(self.db_context)))
+
+    def summary(self):
+        txs = list(self.db_context)
+        split_idx = 1
+        for field in ['category_1', 'category_2', 'category_3']:
+            distinct_values = set(getattr(tx, field) for tx in txs)
+            if len(distinct_values) > 1:
+                break
+            split_idx += 1
+
+        summary = defaultdict(int)
+        for tx in txs:
+            category = format_category([tx.category_1, tx.category_2, tx.category_3][:split_idx])
+            summary[category] += tx.amount_pence
+
+        category_size = max(len(c) for c in summary)
+        lines = []
+        for category in sorted(summary):
+            lines.append('{}  {}'.format(
+                category.ljust(category_size),
+                format_sum(summary[category]),
+            ))
+        lines.append('')
+        self.write_lines(lines)
 
 
 def format_category(category_tuple):
@@ -330,7 +356,7 @@ def format_transaction(transaction):
     return (
         str(transaction.tid),
         transaction.timestamp.strftime('%Y-%m-%d %H:%H'),
-        '£{:.2f}'.format(transaction.amount_pence / 100),
+        format_sum(transaction.amount_pence),
         transaction.description,
         category_string,
     )
@@ -353,6 +379,16 @@ def format_transactions(txs):
         results.append('  '.join(padded_cols))
 
     return results
+
+
+def format_sum(quantity):
+    if quantity > 0:
+        currency = '£'
+    else:
+        currency = '-£'
+        quantity *= -1
+
+    return '{}{:.2f}'.format(currency, quantity / 100)
 
 
 if __name__ == '__main__':
