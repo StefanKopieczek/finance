@@ -4,7 +4,7 @@ import re
 from .api import Transaction
 
 
-def get_transactions(path):
+def get_csv_transactions(path):
     with open(path, newline='', encoding='utf-8-sig') as csvfile:
         reader = csv.reader(csvfile)
         for row in reader:

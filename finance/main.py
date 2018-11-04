@@ -2,7 +2,7 @@ from curses import wrapper
 import datetime
 import sys
 from getpass import getpass
-from .backend import Connection, Transaction, get_transactions
+from .backend import Connection, Transaction, get_csv_transactions, get_pdf_transactions
 from .frontend import Ui
 
 
@@ -35,13 +35,17 @@ def repl():
     wrapper(ui.run)
 
 
-def ingest_csv():
-    db_file, csvpath = sys.argv[1:]
+def ingest_file():
+    db_file, path = sys.argv[1:]
     key = getpass('Password: ')
     db = Connection(db_file, key)
     db.connect()
-    for tx in get_transactions(csvpath):
-        db.store_transaction(tx)
+
+    if path.endswith('.csv'):
+        for tx in get_csv_transactions(path):
+            db.store_transaction(tx)
+    elif path.endswith('.pdf'):
+        get_pdf_transactions(path)
 
 
 if __name__ == '__main__':

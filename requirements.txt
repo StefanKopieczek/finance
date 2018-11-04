@@ -1,1 +1,2 @@
 pysqlcipher3==1.0.3
+pdfminer.six==20170720
