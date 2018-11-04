@@ -34,11 +34,11 @@ class Ui(object):
         title_win.refresh()
         self.title_win = title_win
 
-        self.display_pad = ViewPane()
-        self.display_pad.init_pad(0, title_height, max_width, display_height)
+        self.display_pad = ViewPane(0, title_height, max_width, display_height)
+        self.display_pad.repaint()
 
-        self.input_win = curses.newwin(input_height, max_width, title_height + display_height, 0)
-        self.repaint_input_win()
+        self.input_win = InputPane(0, title_height + display_height, max_width, input_height)
+        self.input_win.repaint()
 
         curses.curs_set(0)
 
@@ -46,35 +46,25 @@ class Ui(object):
         should_continue = True
         c = self.screen.getch()
         if 32 <= c <= 126:
-            self.input_buffer = self.input_buffer[:self.cursor_offset] + chr(c) + self.input_buffer[self.cursor_offset:]
-            self.cursor_offset += 1
+            self.input_win.add_char(c)
         elif c == curses.KEY_LEFT:
-            if self.cursor_offset >= 0:
-                self.cursor_offset -= 1
-            else:
-                curses.beep()
+            self.input_win.move_cursor_left()
         elif c == curses.KEY_RIGHT:
-            if self.cursor_offset < len(self.input_buffer):
-                self.cursor_offset += 1
-            else:
-                curses.beep()
+            self.input_win.move_cursor_right()
         elif c == curses.KEY_BACKSPACE:
-            self.input_buffer = self.input_buffer[:self.cursor_offset - 1] + self.input_buffer[self.cursor_offset:]
-            self.cursor_offset -= 1
+            self.input_win.backspace()
         elif c == curses.KEY_UP:
             self.display_pad.scroll_up(1)
         elif c == curses.KEY_DOWN:
             self.display_pad.scroll_down(1)
         elif c == curses.KEY_ENTER or c == 10 or c == 13:
-            command = self.input_buffer
-            self.input_buffer = ''
-            self.cursor_offset = 0
+            command = self.input_win.flush_buffer()
             self.display_pad.reset_scroll()
             should_continue = self.handle_command(command)
         else:
             return False
 
-        self.repaint_input_win()
+        self.input_win.repaint()
         return should_continue
 
     def handle_command(self, command):
@@ -87,30 +77,59 @@ class Ui(object):
             self.display_pad.write_line('Cannot parse command: {}'.format(command))
         return True
 
-    def repaint_input_win(self):
-        w = self.input_win
-        buf = self.input_buffer
-        cursor_pos = self.cursor_offset
+
+class InputPane(object):
+    INDENT = 4
+
+    def __init__(self, x0, y0, width, height):
+        self.window = curses.newwin(height, width, y0, x0)
+        self.buffer = ''
+        self.cursor_pos = 0
+
+    def repaint(self):
+        w = self.window
         w.clear()
         w.border(' ', ' ', curses.ACS_HLINE, ' ')
-        w.addstr(1, 4, '>', curses.A_BOLD)
-        w.addstr(1, 6, buf[:cursor_pos])
-        w.addstr(1, 6 + cursor_pos, '_', curses.A_BLINK)
-        w.addstr(1, 6 + cursor_pos + 1, buf[cursor_pos:])
+        start = InputPane.INDENT
+        w.addstr(1, start, '>', curses.A_BOLD)
+        w.addstr(1, start + 2, self.buffer[:self.cursor_pos])
+        w.addstr(1, start + 2 + self.cursor_pos, '_', curses.A_BLINK)
+        w.addstr(1, start + 2 + self.cursor_pos + 1, self.buffer[self.cursor_pos:])
         w.refresh()
+
+    def add_char(self, c):
+        self.buffer = self.buffer[:self.cursor_pos] + chr(c) + self.buffer[self.cursor_pos:]
+        self.cursor_pos += 1
+
+    def move_cursor_left(self):
+        if self.cursor_pos >= 0:
+            self.cursor_pos -= 1
+        else:
+            curses.beep()
+
+    def move_cursor_right(self):
+        if self.cursor_pos < len(self.buffer):
+            self.cursor_pos += 1
+        else:
+            curses.beep()
+
+    def backspace(self):
+        self.buffer = self.buffer[:self.cursor_pos - 1] + self.buffer[self.cursor_pos:]
+        self.cursor_pos -= 1
+
+    def flush_buffer(self):
+        flushed = self.buffer
+        self.buffer = ''
+        self.cursor_pos = 0
+        return flushed
 
 
 class ViewPane(object):
-    def __init__(self):
-        self.pad = None
-        self.bounds = (None, None, None, None)
-        self.scroll = 0
-        self.max_scroll = 0
-        self.current_line = 0
-
-    def init_pad(self, x0, y0, width, height):
+    def __init__(self, x0, y0, width, height):
         self.pad = curses.newpad(10000, width)
         self.bounds = (y0, x0, y0 + height, x0 + width)
+        self.scroll = 0
+        self.max_scroll = 0
         self.current_line = height - 1
 
     def repaint(self):
