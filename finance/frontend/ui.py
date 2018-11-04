@@ -68,10 +68,12 @@ class Ui(object):
         return should_continue
 
     def handle_command(self, command):
-        cmd = command.lower()
+        cmd = command.lower().strip()
         if cmd == 'exit':
             return False
-        elif len(cmd.strip()) == 0:
+        elif cmd == 'testlong':
+            self.display_pad.write_line('this is a long sentence' * 100)
+        elif len(cmd) == 0:
             self.display_pad.write_line(' ')
         else:
             self.display_pad.write_line('Cannot parse command: {}'.format(command))
@@ -126,25 +128,44 @@ class InputPane(object):
 
 class ViewPane(object):
     def __init__(self, x0, y0, width, height):
-        self.pad = curses.newpad(10000, width)
-        self.bounds = (y0, x0, y0 + height, x0 + width)
+        self.window = curses.newwin(height, width, y0, x0)
+        self.lines = []
+        self.scrollback = []
+        self.height = height
+        self.width = width
         self.scroll = 0
         self.max_scroll = 0
-        self.current_line = height - 1
 
     def repaint(self):
-        self.pad.refresh(self.scroll, 0, *self.bounds)
+        self.window.clear()
+        frame_start = self.scroll - self.height + 1
+        frame_end = self.scroll
+        if frame_start < 0:
+            padding = -1 * frame_start
+            frame_start = 0
+        else:
+            padding = 0
 
-    def write_line(self, line):
+        frame = self.scrollback[frame_start:frame_end]
+
+        for idx, line in enumerate(frame):
+            self.window.addstr(padding + idx, 0, line)
+        self.window.refresh()
+
+    def render_line(self, line):
         lines = textwrap.wrap(line, width=curses.COLS)
         if len(lines) != 1:
             # If the line got wrapped, or was blank, append an extra newline
             lines += ['']
-        for line in lines:
-            self.pad.addstr(self.current_line, 1, line)
-            self.max_scroll += 1
-            self.current_line += 1
-            self.scroll += 1
+        return lines
+
+    def write_line(self, line):
+        self.lines.append(line)
+        scrollback = self.render_line(line)
+        self.scrollback.extend(scrollback)
+        to_scroll = len(scrollback)
+        self.max_scroll += to_scroll
+        self.scroll += to_scroll
         self.repaint()
 
     def scroll_down(self, num_lines):
@@ -152,7 +173,7 @@ class ViewPane(object):
         self.repaint()
 
     def scroll_up(self, num_lines):
-        self.scroll = max(0, self.scroll - num_lines)
+        self.scroll = max(1, self.scroll - num_lines)
         self.repaint()
 
     def reset_scroll(self):
