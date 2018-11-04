@@ -8,8 +8,6 @@ class Ui(object):
         self.title_win = None
         self.display_pad = None
         self.input_win = None
-        self.input_buffer = ''
-        self.cursor_offset = 0
 
     def run(self, stdscr):
         self.screen = stdscr
