@@ -10,10 +10,6 @@ class Ui(object):
         self.input_win = None
         self.input_buffer = ''
         self.cursor_offset = 0
-        self.display_bounds = (None, None, None, None)
-        self.display_scroll = 0
-        self.display_max_scroll = 0
-        self.display_current_line = 0
 
     def run(self, stdscr):
         self.screen = stdscr
@@ -38,9 +34,8 @@ class Ui(object):
         title_win.refresh()
         self.title_win = title_win
 
-        self.display_pad = curses.newpad(10000, max_width)
-        self.display_bounds = (title_height, 0, display_height + title_height, max_width)
-        self.display_current_line = display_height - 1
+        self.display_pad = ViewPane()
+        self.display_pad.init_pad(0, title_height, max_width, display_height)
 
         self.input_win = curses.newwin(input_height, max_width, title_height + display_height, 0)
         self.repaint_input_win()
@@ -67,16 +62,14 @@ class Ui(object):
             self.input_buffer = self.input_buffer[:self.cursor_offset - 1] + self.input_buffer[self.cursor_offset:]
             self.cursor_offset -= 1
         elif c == curses.KEY_UP:
-            self.display_scroll = max(self.display_scroll - 1, 0)
-            self.repaint_display_pad()
+            self.display_pad.scroll_up(1)
         elif c == curses.KEY_DOWN:
-            self.display_scroll = min(self.display_scroll + 1, self.display_max_scroll)
-            self.repaint_display_pad()
+            self.display_pad.scroll_down(1)
         elif c == curses.KEY_ENTER or c == 10 or c == 13:
             command = self.input_buffer
             self.input_buffer = ''
             self.cursor_offset = 0
-            self.display_scroll = self.display_max_scroll
+            self.display_pad.reset_scroll()
             should_continue = self.handle_command(command)
         else:
             return False
@@ -89,22 +82,10 @@ class Ui(object):
         if cmd == 'exit':
             return False
         elif len(cmd.strip()) == 0:
-            self.write_line(' ')
+            self.display_pad.write_line(' ')
         else:
-            self.write_line('Cannot parse command: {}'.format(command))
+            self.display_pad.write_line('Cannot parse command: {}'.format(command))
         return True
-
-    def write_line(self, line):
-        lines = textwrap.wrap(line, width=curses.COLS)
-        if len(lines) != 1:
-            # If the line got wrapped, or was blank, append an extra newline
-            lines += ['']
-        for line in lines:
-            self.display_pad.addstr(self.display_current_line, 1, line)
-            self.display_scroll += 1
-            self.display_current_line += 1
-            self.display_max_scroll += 1
-        self.repaint_display_pad()
 
     def repaint_input_win(self):
         w = self.input_win
@@ -118,10 +99,46 @@ class Ui(object):
         w.addstr(1, 6 + cursor_pos + 1, buf[cursor_pos:])
         w.refresh()
 
-    def repaint_display_pad(self):
-        top, left, bottom, right = self.display_bounds
-        scroll = self.display_scroll
-        self.display_pad.refresh(scroll, 0, top, left, bottom, right)
+
+class ViewPane(object):
+    def __init__(self):
+        self.pad = None
+        self.bounds = (None, None, None, None)
+        self.scroll = 0
+        self.max_scroll = 0
+        self.current_line = 0
+
+    def init_pad(self, x0, y0, width, height):
+        self.pad = curses.newpad(10000, width)
+        self.bounds = (y0, x0, y0 + height, x0 + width)
+        self.current_line = height - 1
+
+    def repaint(self):
+        self.pad.refresh(self.scroll, 0, *self.bounds)
+
+    def write_line(self, line):
+        lines = textwrap.wrap(line, width=curses.COLS)
+        if len(lines) != 1:
+            # If the line got wrapped, or was blank, append an extra newline
+            lines += ['']
+        for line in lines:
+            self.pad.addstr(self.current_line, 1, line)
+            self.max_scroll += 1
+            self.current_line += 1
+            self.scroll += 1
+        self.repaint()
+
+    def scroll_down(self, num_lines):
+        self.scroll = min(self.max_scroll, self.scroll + num_lines)
+        self.repaint()
+
+    def scroll_up(self, num_lines):
+        self.scroll = max(0, self.scroll - num_lines)
+        self.repaint()
+
+    def reset_scroll(self):
+        self.scroll = self.max_scroll
+        self.repaint()
 
 
 if __name__ == '__main__':
