@@ -142,6 +142,9 @@ class Connection(object):
     def filter(self, criterion):
         return View(self, criterion)
 
+    def as_view(self):
+        return self.filter(Filter.all())
+
 
 class View(object):
     def __init__(self, parent, filter_data):

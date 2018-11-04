@@ -35,7 +35,7 @@ class Ui(object):
         self.title_win = title_win
 
         self.display_area = (0, title_height, max_width, display_height)
-        self.refresh_view_panes([self.db])
+        self.refresh_view_panes([self.db.as_view()])
 
         self.input_win = InputPane(0, title_height + display_height, max_width, input_height)
         self.input_win.repaint()
@@ -49,7 +49,7 @@ class Ui(object):
 
         # Create new view panes
         x0, y0, total_width, height = self.display_area
-        window_width = total_width / len(db_contexts)
+        window_width = int(total_width / len(db_contexts))
         self.view_panes = []
         for idx, db_context in enumerate(db_contexts):
             window = curses.newwin(height, window_width, y0, x0 + window_width * idx)
@@ -228,8 +228,55 @@ class ViewPane(object):
     def handle_command(self, command):
         if len(command) == 0:
             self.write_line(' ')
+            return
+
+        self.write_line('> {}'.format(command))
+        if command == 'list':
+            lines = format_transactions(self.db_context)
+            for line in lines:
+                self.write_line(line)
+            self.write_line('')
         else:
             self.write_line('Cannot parse command: {}'.format(command))
+
+
+def format_transaction(transaction):
+    category_parts = []
+    for cat in [transaction.category_1, transaction.category_2, transaction.category_3]:
+        if cat is None:
+            break
+        else:
+            category_parts.append(cat)
+
+    category_string = ' > '.join(category_parts)
+    if len(category_string) == 0:
+        category_string = '[UNTAGGED]'
+
+    return (
+        transaction.timestamp.strftime('%Y-%m-%d %H:%H'),
+        '£{:.2f}'.format(transaction.amount_pence / 100),
+        transaction.description,
+        category_string,
+    )
+
+
+def format_transactions(txs):
+    if len(txs) == 0:
+        return []
+
+    tx_rows = [format_transaction(t) for t in txs]
+    col_lengths = []
+    for idx in range(len(tx_rows[0])):
+        col_lengths.append(max(len(row[idx]) for row in tx_rows))
+
+    results = []
+    for row in tx_rows:
+        padded_cols = []
+        for idx, part in enumerate(row):
+            padded_cols.append(part.ljust(col_lengths[idx]))
+        results.append('  '.join(padded_cols))
+
+    return results
 
 
 if __name__ == '__main__':
