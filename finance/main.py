@@ -23,7 +23,7 @@ def add_test_data(db):
         db.store_transaction(tx)
 
 
-if __name__ == '__main__':
+def repl():
     db_file, key = sys.argv[1:]
     db = Connection(db_file, key)
     db.connect()
@@ -31,3 +31,7 @@ if __name__ == '__main__':
         add_test_data(db)
     ui = Ui(db)
     wrapper(ui.run)
+
+
+if __name__ == '__main__':
+    repl()

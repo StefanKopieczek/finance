@@ -7,4 +7,10 @@ setup(name='finance',
       author='Stefan Kopieczek',
       license='LGPLv2',
       packages=['finance'],
-      zip_safe=False)
+      zip_safe=False,
+      entry_points = {
+          'console_scripts': [
+              'finance=finance.main:repl'
+          ]
+      }
+      )
