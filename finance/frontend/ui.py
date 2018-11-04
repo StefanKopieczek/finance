@@ -286,6 +286,13 @@ class ViewPane(object):
         elif command == 'filter untagged':
             self.db_context = self.db_context.filter(Filter.untagged())
             self.print_filter_status()
+        elif command.startswith('filter tag'):
+            _, _, *tags = command.split()  # noqa
+            if len(tags) == 0 or len(tags) > 3:
+                self.write_line('ERROR: Must specify between one and three tags')
+                return
+            self.db_context = self.db_context.filter(Filter.category(tuple(tags)))
+            self.print_filter_status()
         elif command.startswith('filter \"') or command.startswith('filter \''):
             _, term = command.split(maxsplit=1)
             if len(term) == 1 or term[0] != term[-1]:
@@ -300,6 +307,7 @@ class ViewPane(object):
         elif command == 'reset':
             self.db_context = self.original_db_context
             self.write_line('=> Showing {} total transactions'.format(len(self.db_context)))
+            self.write_line('')
         else:
             self.write_line('Cannot parse command: {}'.format(command))
 
@@ -311,6 +319,7 @@ class ViewPane(object):
 
     def print_filter_status(self):
         self.write_line('=> Filtered down to {} transactions'.format(len(self.db_context)))
+        self.write_line('')
 
     def summary(self):
         txs = list(self.db_context)
