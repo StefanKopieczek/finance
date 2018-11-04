@@ -3,11 +3,13 @@ import textwrap
 
 
 class Ui(object):
-    def __init__(self):
+    def __init__(self, db):
+        self.db = db
         self.screen = None
         self.title_win = None
-        self.display_pad = None
+        self.view_panes = []
         self.input_win = None
+        self.display_area = None
 
     def run(self, stdscr):
         self.screen = stdscr
@@ -32,14 +34,28 @@ class Ui(object):
         title_win.refresh()
         self.title_win = title_win
 
-        display_window = curses.newwin(display_height, max_width, title_height, 0)
-        self.display_pad = ViewPane(display_window)
-        self.display_pad.repaint()
+        self.display_area = (0, title_height, max_width, display_height)
+        self.refresh_view_panes([self.db])
 
         self.input_win = InputPane(0, title_height + display_height, max_width, input_height)
         self.input_win.repaint()
 
         curses.curs_set(0)
+
+    def refresh_view_panes(self, db_contexts):
+        # Hide existing view panes
+        for view_pane in self.view_panes:
+            view_pane.rebind(None)
+
+        # Create new view panes
+        x0, y0, total_width, height = self.display_area
+        window_width = total_width / len(db_contexts)
+        self.view_panes = []
+        for idx, db_context in enumerate(db_contexts):
+            window = curses.newwin(height, window_width, y0, x0 + window_width * idx)
+            view_pane = ViewPane(window, db_context)
+            view_pane.repaint()
+            self.view_panes.append(view_pane)
 
     def handle_input(self):
         should_continue = True
@@ -53,12 +69,15 @@ class Ui(object):
         elif c == curses.KEY_BACKSPACE:
             self.input_win.backspace()
         elif c == curses.KEY_UP:
-            self.display_pad.scroll_up(1)
+            for pane in self.view_panes:
+                pane.scroll_up(1)
         elif c == curses.KEY_DOWN:
-            self.display_pad.scroll_down(1)
+            for pane in self.view_panes:
+                pane.scroll_down(1)
         elif c == curses.KEY_ENTER or c == 10 or c == 13:
             command = self.input_win.flush_buffer()
-            self.display_pad.reset_scroll()
+            for pane in self.view_panes:
+                pane.reset_scroll()
             should_continue = self.handle_command(command)
         else:
             return False
@@ -68,13 +87,22 @@ class Ui(object):
 
     def handle_command(self, command):
         cmd = command.lower().strip()
-        if cmd == 'exit':
-            return False
-        elif len(cmd) == 0:
-            self.display_pad.write_line(' ')
+        is_handled, continue_running = self.handle_global_command(cmd)
+        if not is_handled:
+            for pane in self.view_panes:
+                pane.handle_command(cmd)
+
+        return continue_running
+
+    def handle_global_command(self, command):
+        if command == 'exit':
+            return True, False
+        elif command.startswith('testsplit '):
+            num_panes = int(command.split()[1])
+            self.refresh_view_panes([None] * num_panes)
+            return True, True
         else:
-            self.display_pad.write_line('Cannot parse command: {}'.format(command))
-        return True
+            return False, True
 
 
 class InputPane(object):
@@ -124,45 +152,52 @@ class InputPane(object):
 
 
 class ViewPane(object):
-    def __init__(self, window):
+    def __init__(self, window, db_context):
         self.window = window
         self.lines = []
         self.scrollback = []
-        self.height, self.width = window.getmaxyx()
         self.scroll = 0
         self.max_scroll = 0
+        self.db_context = db_context
 
     def repaint(self):
-        self.window.clear()
-        frame_start = self.scroll - self.height + 1
-        frame_end = self.scroll
-        if frame_start < 0:
-            padding = -1 * frame_start
-            frame_start = 0
-        else:
-            padding = 0
+        if self.window is not None:
+            height, _ = self.window.getmaxyx()
+            self.window.clear()
+            self.window.border(0, 0, ' ', ' ')
+            frame_start = self.scroll - height + 1
+            frame_end = self.scroll
+            if frame_start < 0:
+                padding = -1 * frame_start
+                frame_start = 0
+            else:
+                padding = 0
 
-        frame = self.scrollback[frame_start:frame_end]
+            frame = self.scrollback[frame_start:frame_end]
 
-        for idx, line in enumerate(frame):
-            self.window.addstr(padding + idx, 0, line)
-        self.window.refresh()
+            for idx, line in enumerate(frame):
+                self.window.addstr(padding + idx, 2, line)
+            self.window.refresh()
 
     def rebind(self, window):
-        self.window.clear()
-        self.window.refresh()
-        window.clear()
+        if self.window is not None:
+            self.window.clear()
+            self.window.refresh()
+
+        if window is not None:
+            window.clear()
 
         self.window = window
-        self.height, self.width = window.getmaxyx()
-
         lines = self.lines
         self.lines, self.scrollback = [], []
         self.scroll, self.max_scroll = 0, 0
         self.write_lines(lines)
 
     def render_line(self, line):
-        lines = textwrap.wrap(line, width=curses.COLS)
+        _, area_width = self.window.getmaxyx()
+        border_width = 4
+        actual_width = area_width - border_width
+        lines = textwrap.wrap(line, width=actual_width)
         if len(lines) != 1:
             # If the line got wrapped, or was blank, append an extra newline
             lines += ['']
@@ -173,13 +208,14 @@ class ViewPane(object):
 
     def write_lines(self, lines):
         self.lines.extend(lines)
-        for line in lines:
-            rendered_lines = self.render_line(line)
-            self.scrollback.extend(rendered_lines)
-            to_scroll = len(rendered_lines)
-            self.max_scroll += to_scroll
-            self.scroll += to_scroll
-        self.repaint()
+        if self.window is not None:
+            for line in lines:
+                rendered_lines = self.render_line(line)
+                self.scrollback.extend(rendered_lines)
+                to_scroll = len(rendered_lines)
+                self.max_scroll += to_scroll
+                self.scroll += to_scroll
+            self.repaint()
 
     def scroll_down(self, num_lines):
         self.scroll = min(self.max_scroll, self.scroll + num_lines)
@@ -193,7 +229,16 @@ class ViewPane(object):
         self.scroll = self.max_scroll
         self.repaint()
 
+    def handle_command(self, command):
+        if len(command) == 0:
+            self.write_line(' ')
+        elif command == 'testtext':
+            self.window.addstr(10, 10, "foo")
+            self.window.refresh()
+        else:
+            self.write_line('Cannot parse command: {}'.format(command))
+
 
 if __name__ == '__main__':
-    ui = Ui()
+    ui = Ui(None)
     curses.wrapper(ui.run)
