@@ -232,9 +232,12 @@ class ViewPane(object):
 
         self.write_line('> {}'.format(command))
         if command == 'list':
+            count = 0
             lines = format_transactions(self.db_context)
             for line in lines:
+                count += 1
                 self.write_line(line)
+            self.write_line('--- {} transactions ---'.format(count))
             self.write_line('')
         else:
             self.write_line('Cannot parse command: {}'.format(command))
