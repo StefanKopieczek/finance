@@ -248,6 +248,20 @@ class ViewPane(object):
             lines = sorted([format_category(tag) for tag in tags])
             lines.append('')
             self.write_lines(lines)
+        elif command.startswith('tag all'):
+            _, _, *categories = command.split() # noqa
+            if len(categories) > 3:
+                self.write_line('ERROR: At most 3 categories permitted')
+                return
+
+            count = len(self.db_context)
+            tag = format_category(categories)
+            if len(categories) < 3:
+                categories.extend([None] * (3 - len(categories)))
+            for tx in self.db_context:
+                tx.category_1, tx.category_2, tx.category_3 = categories
+                self.db_context.db.store_transaction(tx)
+            self.write_line('Updated {} transactions'.format(count))
         elif command.startswith('tag'):
             parts = command.split()
             if len(parts) == 1:
@@ -270,8 +284,20 @@ class ViewPane(object):
                 self.db_context.db.store_transaction(tx)
         elif command == 'filter untagged':
             self.db_context = self.db_context.filter(Filter.untagged())
+            self.print_filter_status()
+        elif command.startswith('filter \"') or command.startswith('filter \''):
+            _, term = command.split(maxsplit=1)
+            if len(term) == 1 or term[0] != term[-1]:
+                self.write_line('ERROR: Invalid term {}', term)
+                return
+            else:
+                term = term[1:-1]
+                self.db_context = self.db_context.filter(Filter.description(term))
+                self.print_filter_status()
+
         elif command == 'reset':
             self.db_context = self.original_db_context
+            self.write_line('=> Showing {} total transactions'.format(len(self.db_context)))
         else:
             self.write_line('Cannot parse command: {}'.format(command))
 
@@ -280,6 +306,9 @@ class ViewPane(object):
         lines.append('--- {} transactions ---'.format(len(lines)))
         lines.append('')
         self.write_lines(lines)
+
+    def print_filter_status(self):
+        self.write_line('=> Filtered down to {} transactions'.format(len(self.db_context)))
 
 
 def format_category(category_tuple):
