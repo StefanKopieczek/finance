@@ -237,12 +237,15 @@ class ViewPane(object):
 
         self.write_line('> {}'.format(command))
         if command == 'list':
-            lines = list(format_transactions(self.db_context))
-            lines.append('--- {} transactions ---'.format(len(lines)))
-            lines.append('')
-            self.write_lines(lines)
+            self.list_transactions(self.db_context)
         else:
             self.write_line('Cannot parse command: {}'.format(command))
+
+    def list_transactions(self, txs):
+        lines = list(format_transactions(txs))
+        lines.append('--- {} transactions ---'.format(len(lines)))
+        lines.append('')
+        self.write_lines(lines)
 
 
 def format_transaction(transaction):
