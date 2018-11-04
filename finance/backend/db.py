@@ -107,11 +107,11 @@ class Connection(object):
             query = 'SELECT * from transactions WHERE {}'.format(condition)
             qs = c.execute(query, params)
             for row in qs:
-                yield self._deserialize_transaction(row)
+                yield self._deserialize_tx(row)
 
     def has_transaction(self, tx):
         with self._safe_cursor() as c:
-            t_serial = self._serialize_transaction(tx)
+            t_serial = self._serialize_tx(tx)
             q = '''SELECT COUNT(*) from transactions WHERE
                      timestamp=? AND
                      description=? AND
@@ -129,26 +129,28 @@ class Connection(object):
                         (timestamp, description, amount_pence,
                         category_1, category_2, category_3, notes)
                         VALUES (?, ?, ?, ?, ?, ?, ?)""",
-                      self._serialize_transaction(tx))
+                      self._serialize_tx(tx))
             self.db.commit()
             tx.tid = c.lastrowid
 
     def _update_transaction(self, tx):
+        assert(self.has_transaction(tx))
         with self._safe_cursor() as c:
             c.execute("""UPDATE transactions
                          SET timestamp=?, description=?, amount_pence=?,
                              category_1=?, category_2=?, category_3=?, notes=?
                          WHERE id=?""",
-                      self._serialize_transaction(tx))
+                      self._serialize_tx(tx) + (tx.tid,))
+            assert(c.rowcount == 1)
             self.db.commit()
 
-    def _serialize_transaction(self, tx):
+    def _serialize_tx(self, tx):
         return (_datetime_to_epoch(tx.timestamp),
                 tx.description, tx.amount_pence,
                 tx.category_1, tx.category_2, tx.category_3,
                 tx.notes)
 
-    def _deserialize_transaction(self, tx_row):
+    def _deserialize_tx(self, tx_row):
         tx = Transaction(*tx_row)
         tx.timestamp = _epoch_to_datetime(tx.timestamp)
         return tx
@@ -178,6 +180,9 @@ class View(object):
 
     def __len__(self):
         return sum(1 for _ in self)
+
+    def filter(self, criterion):
+        return View(self, criterion)
 
 
 class Filter(object):
@@ -217,6 +222,10 @@ class Filter(object):
     def date_after(end_incl):
         end_epoch = _datetime_to_epoch(end_incl)
         return ('timestamp >= ?', (end_epoch,))
+
+    @staticmethod
+    def id(tid):
+        return ('id = ?', (tid,))
 
 
 class SchemaMismatch(Exception):

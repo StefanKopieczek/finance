@@ -238,6 +238,20 @@ class ViewPane(object):
         self.write_line('> {}'.format(command))
         if command == 'list':
             self.list_transactions(self.db_context)
+        elif command.startswith('tag'):
+            _, tid, *categories = command.split()
+            if len(categories) > 3:
+                self.write_line('ERROR: At most 3 categories permitted')
+            matches = list(self.db_context.db.fetch_transactions('id=?', (tid,)))
+            if len(matches) == 0:
+                self.write_line('ERROR: Transaction #{} not found'.format(tid))
+            else:
+                tx = matches[0]
+                if len(categories) < 3:
+                    categories.extend([None] * (3 - len(categories)))
+                tx.category_1, tx.category_2, tx.category_3 = categories
+                self.db_context.db.store_transaction(tx)
+
         else:
             self.write_line('Cannot parse command: {}'.format(command))
 
@@ -261,6 +275,7 @@ def format_transaction(transaction):
         category_string = '[UNTAGGED]'
 
     return (
+        str(transaction.tid),
         transaction.timestamp.strftime('%Y-%m-%d %H:%H'),
         '£{:.2f}'.format(transaction.amount_pence / 100),
         transaction.description,
