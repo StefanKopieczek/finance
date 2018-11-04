@@ -10,7 +10,8 @@ setup(name='finance',
       zip_safe=False,
       entry_points = {
           'console_scripts': [
-              'finance=finance.main:repl'
+              'finance=finance.main:repl',
+              'finance-store=finance.main:ingest_csv',
           ]
       }
       )

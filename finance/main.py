@@ -1,7 +1,8 @@
 from curses import wrapper
 import datetime
 import sys
-from .backend import Connection, Transaction
+from getpass import getpass
+from .backend import Connection, Transaction, get_transactions
 from .frontend import Ui
 
 
@@ -24,13 +25,23 @@ def add_test_data(db):
 
 
 def repl():
-    db_file, key = sys.argv[1:]
+    db_file = sys.argv[1]
+    key = getpass('Password: ')
     db = Connection(db_file, key)
     db.connect()
     if len(db.as_view()) == 0:
         add_test_data(db)
     ui = Ui(db)
     wrapper(ui.run)
+
+
+def ingest_csv():
+    db_file, csvpath = sys.argv[1:]
+    key = getpass('Password: ')
+    db = Connection(db_file, key)
+    db.connect()
+    for tx in get_transactions(csvpath):
+        db.store_transaction(tx)
 
 
 if __name__ == '__main__':
