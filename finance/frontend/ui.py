@@ -1,6 +1,7 @@
 import curses
 import textwrap
 import time
+from ..backend import Filter
 
 
 class Ui(object):
@@ -142,8 +143,9 @@ class InputPane(object):
             curses.beep()
 
     def backspace(self):
-        self.buffer = self.buffer[:self.cursor_pos - 1] + self.buffer[self.cursor_pos:]
-        self.cursor_pos -= 1
+        if self.cursor_pos > 0:
+            self.buffer = self.buffer[:self.cursor_pos - 1] + self.buffer[self.cursor_pos:]
+            self.cursor_pos -= 1
 
     def flush_buffer(self):
         flushed = self.buffer
@@ -160,6 +162,7 @@ class ViewPane(object):
         self.scroll = 0
         self.max_scroll = 0
         self.db_context = db_context
+        self.original_db_context = db_context
 
     def repaint(self):
         if self.window is not None:
@@ -238,10 +241,24 @@ class ViewPane(object):
         self.write_line('> {}'.format(command))
         if command == 'list':
             self.list_transactions(self.db_context)
+        elif command == 'tags':
+            tags = self.db_context.db.select_raw('''SELECT DISTINCT
+                                                    category_1, category_2, category_3
+                                                    FROM transactions''', tuple())
+            lines = sorted([format_category(tag) for tag in tags])
+            lines.append('')
+            self.write_lines(lines)
         elif command.startswith('tag'):
-            _, tid, *categories = command.split()  # noqa
+            parts = command.split()
+            if len(parts) == 1:
+                self.write_line('ERROR: Transaction ID required')
+                return
+
+            _, tid, *categories = parts # noqa
             if len(categories) > 3:
                 self.write_line('ERROR: At most 3 categories permitted')
+                return
+
             matches = list(self.db_context.db.fetch_transactions('id=?', (tid,)))
             if len(matches) == 0:
                 self.write_line('ERROR: Transaction #{} not found'.format(tid))
@@ -251,7 +268,10 @@ class ViewPane(object):
                     categories.extend([None] * (3 - len(categories)))
                 tx.category_1, tx.category_2, tx.category_3 = categories
                 self.db_context.db.store_transaction(tx)
-
+        elif command == 'filter untagged':
+            self.db_context = self.db_context.filter(Filter.untagged())
+        elif command == 'reset':
+            self.db_context = self.original_db_context
         else:
             self.write_line('Cannot parse command: {}'.format(command))
 
@@ -262,17 +282,21 @@ class ViewPane(object):
         self.write_lines(lines)
 
 
-def format_transaction(transaction):
+def format_category(category_tuple):
     category_parts = []
-    for cat in [transaction.category_1, transaction.category_2, transaction.category_3]:
+    for cat in category_tuple:
         if cat is None:
             break
         else:
             category_parts.append(cat)
-
     category_string = ' > '.join(category_parts)
     if len(category_string) == 0:
         category_string = '[UNTAGGED]'
+    return category_string
+
+
+def format_transaction(transaction):
+    category_string = format_category((transaction.category_1, transaction.category_2, transaction.category_3))
 
     return (
         str(transaction.tid),

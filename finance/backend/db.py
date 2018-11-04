@@ -120,6 +120,10 @@ class Connection(object):
             assert(res in [0, 1])
             return res == 1
 
+    def select_raw(self, query, params):
+        with self._safe_cursor() as c:
+            return c.execute(query, params).fetchall()
+
     def _create_transaction(self, tx):
         if self.has_transaction(tx):
             return
@@ -226,6 +230,10 @@ class Filter(object):
     @staticmethod
     def id(tid):
         return ('id = ?', (tid,))
+
+    @staticmethod
+    def untagged():
+        return ('category_1 IS NULL', tuple())
 
 
 class SchemaMismatch(Exception):
