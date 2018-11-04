@@ -1,7 +1,8 @@
 from curses import wrapper
 import datetime
 import sys
-from finance import Ui, Connection, Transaction
+from .backend import Connection, Transaction
+from .frontend import Ui
 
 
 def add_test_data(db):
