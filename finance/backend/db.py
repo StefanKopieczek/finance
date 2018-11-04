@@ -109,7 +109,21 @@ class Connection(object):
             for row in qs:
                 yield self._deserialize_transaction(row)
 
+    def has_transaction(self, tx):
+        with self._safe_cursor() as c:
+            t_serial = self._serialize_transaction(tx)
+            q = '''SELECT COUNT(*) from transactions WHERE
+                     timestamp=? AND
+                     description=? AND
+                     amount_pence=?'''
+            res = c.execute(q, t_serial[:3]).fetchone()[0]
+            assert(res in [0, 1])
+            return res == 1
+
     def _create_transaction(self, tx):
+        if self.has_transaction(tx):
+            return
+
         with self._safe_cursor() as c:
             c.execute("""INSERT INTO transactions
                         (timestamp, description, amount_pence,
