@@ -239,7 +239,7 @@ class ViewPane(object):
         if command == 'list':
             self.list_transactions(self.db_context)
         elif command.startswith('tag'):
-            _, tid, *categories = command.split()
+            _, tid, *categories = command.split()  # noqa
             if len(categories) > 3:
                 self.write_line('ERROR: At most 3 categories permitted')
             matches = list(self.db_context.db.fetch_transactions('id=?', (tid,)))
