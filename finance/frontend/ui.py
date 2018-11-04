@@ -1,5 +1,6 @@
 import curses
 import textwrap
+import time
 
 
 class Ui(object):
@@ -71,9 +72,13 @@ class Ui(object):
         elif c == curses.KEY_UP:
             for pane in self.view_panes:
                 pane.scroll_up(1)
+            time.sleep(0.05)
+            curses.flushinp()
         elif c == curses.KEY_DOWN:
             for pane in self.view_panes:
                 pane.scroll_down(1)
+            time.sleep(0.05)
+            curses.flushinp()
         elif c == curses.KEY_ENTER or c == 10 or c == 13:
             command = self.input_win.flush_buffer()
             for pane in self.view_panes:
