@@ -34,7 +34,8 @@ class Ui(object):
         title_win.refresh()
         self.title_win = title_win
 
-        self.display_pad = ViewPane(0, title_height, max_width, display_height)
+        display_window = curses.newwin(display_height, max_width, title_height, 0)
+        self.display_pad = ViewPane(display_window)
         self.display_pad.repaint()
 
         self.input_win = InputPane(0, title_height + display_height, max_width, input_height)
@@ -71,8 +72,6 @@ class Ui(object):
         cmd = command.lower().strip()
         if cmd == 'exit':
             return False
-        elif cmd == 'testlong':
-            self.display_pad.write_line('this is a long sentence' * 100)
         elif len(cmd) == 0:
             self.display_pad.write_line(' ')
         else:
@@ -127,12 +126,11 @@ class InputPane(object):
 
 
 class ViewPane(object):
-    def __init__(self, x0, y0, width, height):
-        self.window = curses.newwin(height, width, y0, x0)
+    def __init__(self, window):
+        self.window = window
         self.lines = []
         self.scrollback = []
-        self.height = height
-        self.width = width
+        self.height, self.width = window.getmaxyx()
         self.scroll = 0
         self.max_scroll = 0
 
@@ -152,6 +150,19 @@ class ViewPane(object):
             self.window.addstr(padding + idx, 0, line)
         self.window.refresh()
 
+    def rebind(self, window):
+        self.window.clear()
+        self.window.refresh()
+        window.clear()
+
+        self.window = window
+        self.height, self.width = window.getmaxyx()
+
+        lines = self.lines
+        self.lines, self.scrollback = [], []
+        self.scroll, self.max_scroll = 0, 0
+        self.write_lines(lines)
+
     def render_line(self, line):
         lines = textwrap.wrap(line, width=curses.COLS)
         if len(lines) != 1:
@@ -160,12 +171,16 @@ class ViewPane(object):
         return lines
 
     def write_line(self, line):
-        self.lines.append(line)
-        scrollback = self.render_line(line)
-        self.scrollback.extend(scrollback)
-        to_scroll = len(scrollback)
-        self.max_scroll += to_scroll
-        self.scroll += to_scroll
+        self.write_lines([line])
+
+    def write_lines(self, lines):
+        self.lines.extend(lines)
+        for line in lines:
+            rendered_lines = self.render_line(line)
+            self.scrollback.extend(rendered_lines)
+            to_scroll = len(rendered_lines)
+            self.max_scroll += to_scroll
+            self.scroll += to_scroll
         self.repaint()
 
     def scroll_down(self, num_lines):
