@@ -2,19 +2,42 @@ import datetime
 import re
 from .api import Transaction
 from collections import defaultdict
-# from pdfminer.pdfparser import PDFParser
-# from pdfminer.pdfdocument import PDFDocument
 from pdfminer.pdfpage import PDFPage
-# from pdfminer.pdfpage import PDFTextExtractionNotAllowed
 from pdfminer.pdfinterp import PDFResourceManager
 from pdfminer.pdfinterp import PDFPageInterpreter
 from pdfminer.pdfdevice import PDFDevice
 from pdfminer.layout import LAParams
 from pdfminer.converter import PDFPageAggregator
 import pdfminer
+from more_itertools import peekable
 
 
 def get_pdf_transactions(path):
+    raw_row_data = get_text_rows(path)
+    pages = paginate_rows(raw_row_data)
+    for page in pages:
+        for row in page:
+            print(row)
+
+
+def paginate_rows(raw_rows):
+    def build_one_page(raw_rows):
+        raw_rows = peekable(raw_rows)
+        try:
+            raw_row = next(raw_rows)
+            page, _, _ = raw_row
+            yield raw_row
+            while raw_rows.peek()[0] == page:
+                yield next(raw_rows)
+        except StopIteration:
+            pass
+        return
+
+    while True:
+        yield build_one_page(raw_rows)
+
+
+def get_text_rows(path):
     rows = defaultdict(list)
     # Open a PDF file.
     fp = open(path, 'rb')
@@ -54,7 +77,7 @@ def get_pdf_transactions(path):
         for obj in lt_objs:
             # if it's a textbox, print text and location
             if isinstance(obj, pdfminer.layout.LTTextBoxHorizontal):
-                rows[(page, int(obj.bbox[1]))].append((int(obj.bbox[0]), repr(obj.get_text().replace('\n', '_'))))
+                rows[(page, -int(obj.bbox[1]))].append((int(obj.bbox[0]), repr(obj.get_text().replace('\n', '_'))))
             # if it's a container, recurse
             elif isinstance(obj, pdfminer.layout.LTFigure):
                 parse_obj(obj._objs, page)
@@ -68,13 +91,10 @@ def get_pdf_transactions(path):
         # extract text from this object
         parse_obj(layout._objs, page_num)
 
-    for y in sorted(rows):
-        print(y, rows[y])
-
-    for y in rows:
-        for box in rows[y]:
-            if 'palantir' in box[1].lower():
-                print(y, rows[y])
+    for key in sorted(rows):
+        page, y = key
+        y = -y
+        yield (page, y, rows[key])
 
 
 def parse_row(row):
