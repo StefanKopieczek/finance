@@ -25,10 +25,10 @@ def paginate_rows(raw_rows):
         raw_rows = peekable(raw_rows)
         try:
             raw_row = next(raw_rows)
-            page, _, _ = raw_row
-            yield raw_row
+            page, _, row = raw_row
+            yield row
             while raw_rows.peek()[0] == page:
-                yield next(raw_rows)
+                yield next(raw_rows)[2]
         except StopIteration:
             pass
         return
