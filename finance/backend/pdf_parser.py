@@ -56,7 +56,13 @@ def parse_transaction_row(row, header_columns):
 
 
 def row_is_valid(*args):
-    return len([arg for arg in args if arg is not None]) > 1
+    if args[2] is None:
+        return False
+    if 'BALANCE BROUGHT FORWARD' in args[2]:
+        return False
+    if 'BALANCE CARRIED FORWARD' in args[2]:
+        return False
+    return True
 
 
 def extract_header_columns(page):
@@ -107,8 +113,8 @@ def get_text_rows(path):
     # BEGIN LAYOUT ANALYSIS
     # Set parameters for analysis.
     laparams = LAParams()
-    laparams.line_overlap = 0.1
-    laparams.line_margin = 0.1
+    laparams.line_overlap = 0.01
+    laparams.line_margin = 0.01
     laparams.word_margin = 0.15
 
     # Create a PDF page aggregator object.
