@@ -1,5 +1,4 @@
 chardet==3.0.4
-more-itertools==6.0.0
 pdfminer.six==20170720
 pycryptodome==3.7.3
 pysqlcipher3==1.0.3

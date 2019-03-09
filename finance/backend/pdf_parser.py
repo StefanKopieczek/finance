@@ -9,32 +9,77 @@ from pdfminer.pdfdevice import PDFDevice
 from pdfminer.layout import LAParams
 from pdfminer.converter import PDFPageAggregator
 import pdfminer
-from more_itertools import peekable
 
 
 def get_pdf_transactions(path):
     raw_row_data = get_text_rows(path)
     pages = paginate_rows(raw_row_data)
     for page in pages:
-        for row in page:
-            print(row)
+        extract_transactions_from_page(page)
+
+
+def extract_transactions_from_page(page):
+    rows_iter = iter(page)
+    try:
+        header_columns = extract_header_columns(rows_iter)
+    except KeyError:
+        # No headers, so this page doesn't have any transactions
+        return
+
+    for row in rows_iter:
+        date, payment_type, details, paid_out, paid_in = parse_transaction_row(row, header_columns)
+        if row_is_valid(date, payment_type, details, paid_out, paid_in):
+            print(date, payment_type, details, paid_out, paid_in)
+
+
+def parse_transaction_row(row, header_columns):
+    parsed_columns = [None, None, None, None]
+    payment_details = None
+    unparsed_columns = []
+    for column, value in row:
+        for col_type, col_type_x in enumerate(header_columns):
+            if abs(column - col_type_x) < 20:
+                parsed_columns[col_type] = value
+                break
+        else:
+            unparsed_columns.append((column, value))
+    if len(unparsed_columns) > 1:
+        return None, None, None, None, None
+    elif len(unparsed_columns) == 1:
+        column, value = unparsed_columns[0]
+        if column > header_columns[1] and column < header_columns[2]:
+            payment_details = value
+        else:
+            return None, None, None, None, None
+    date, payment_type, paid_out, paid_in = parsed_columns
+    return date, payment_type, payment_details, paid_out, paid_in
+
+
+def row_is_valid(*args):
+    return len([arg for arg in args if arg is not None]) > 1
+
+
+def extract_header_columns(page):
+    for columns in page:
+        if 'Date' in columns[0][1]:
+            break
+    else:
+        raise KeyError("No headers on this page")
+
+    return [columns[col][0] for col in range(4)]
 
 
 def paginate_rows(raw_rows):
-    def build_one_page(raw_rows):
-        raw_rows = peekable(raw_rows)
-        try:
-            raw_row = next(raw_rows)
-            page, _, row = raw_row
-            yield row
-            while raw_rows.peek()[0] == page:
-                yield next(raw_rows)[2]
-        except StopIteration:
-            pass
-        return
-
-    while True:
-        yield build_one_page(raw_rows)
+    page = []
+    page_id = -1
+    for row in raw_rows:
+        if page_id == -1:
+            page_id = row[0]
+        elif page_id != row[0]:
+            yield page
+            page = [row[2]]
+            page_id = row[0]
+        page.append(row[2])
 
 
 def get_text_rows(path):
@@ -92,6 +137,7 @@ def get_text_rows(path):
         parse_obj(layout._objs, page_num)
 
     for key in sorted(rows):
+        rows[key] = sorted(rows[key])
         page, y = key
         y = -y
         yield (page, y, rows[key])
