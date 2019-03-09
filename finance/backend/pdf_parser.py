@@ -62,8 +62,8 @@ def get_text_rows(path):
     # BEGIN LAYOUT ANALYSIS
     # Set parameters for analysis.
     laparams = LAParams()
-    laparams.line_overlap = 0.01
-    laparams.line_margin = 0.01
+    laparams.line_overlap = 0.1
+    laparams.line_margin = 0.1
     laparams.word_margin = 0.15
 
     # Create a PDF page aggregator object.
