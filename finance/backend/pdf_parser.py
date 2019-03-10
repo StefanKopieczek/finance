@@ -14,11 +14,12 @@ import pdfminer
 def get_pdf_transactions(path):
     raw_row_data = get_text_rows(path)
     pages = paginate_rows(raw_row_data)
+    date_holder = [None]
     for page in pages:
-        extract_transactions_from_page(page)
+        yield from extract_transactions_from_page(page, date_holder)
 
 
-def extract_transactions_from_page(page):
+def extract_transactions_from_page(page, date_holder):
     rows_iter = iter(page)
     try:
         header_columns = extract_header_columns(rows_iter)
@@ -26,10 +27,28 @@ def extract_transactions_from_page(page):
         # No headers, so this page doesn't have any transactions
         return
 
+    curr_date = date_holder[0]
+    curr_desc = ''
+
     for row in rows_iter:
         date, payment_type, details, paid_out, paid_in = parse_transaction_row(row, header_columns)
         if row_is_valid(date, payment_type, details, paid_out, paid_in):
-            print(date, payment_type, details, paid_out, paid_in)
+            if date is not None:
+                curr_date = date
+            if details is not None:
+                curr_desc += details + ' '
+            if paid_out is not None:
+                if curr_date is None:
+                    raise ValueError("Date: " + repr(date) + ", details: " + repr(details))
+                yield Transaction(None, curr_date, curr_desc.strip(), paid_out)
+                curr_desc = ''
+            elif paid_in is not None:
+                if curr_date is None:
+                    raise ValueError("Date: " + repr(date) + ", details: " + repr(details))
+                yield Transaction(None, curr_date, curr_desc.strip(), -paid_in)
+                curr_desc = ''
+
+    date_holder[0] = curr_date
 
 
 def parse_transaction_row(row, header_columns):
@@ -43,16 +62,33 @@ def parse_transaction_row(row, header_columns):
                 break
         else:
             unparsed_columns.append((column, value))
-    if len(unparsed_columns) > 1:
-        return None, None, None, None, None
-    elif len(unparsed_columns) == 1:
+    if len(unparsed_columns) > 0:
         column, value = unparsed_columns[0]
         if column > header_columns[1] and column < header_columns[2]:
             payment_details = value
         else:
             return None, None, None, None, None
+
     date, payment_type, paid_out, paid_in = parsed_columns
+    try:
+        if date is not None:
+            date = parse_date(date)
+        if paid_out is not None:
+            paid_out = parse_quantity(paid_out)
+        if paid_in is not None:
+            paid_in = parse_quantity(paid_in)
+    except ValueError:
+        return None, None, None, None, None
+
     return date, payment_type, payment_details, paid_out, paid_in
+
+
+def parse_date(date):
+    return datetime.datetime.strptime(date, '%d %b %y')
+
+
+def parse_quantity(quantity):
+    return int(float(quantity.replace(',', '')) * 100)
 
 
 def row_is_valid(*args):
@@ -128,7 +164,7 @@ def get_text_rows(path):
         for obj in lt_objs:
             # if it's a textbox, print text and location
             if isinstance(obj, pdfminer.layout.LTTextBoxHorizontal):
-                rows[(page, -int(obj.bbox[1]))].append((int(obj.bbox[0]), repr(obj.get_text().replace('\n', '_'))))
+                rows[(page, -int(obj.bbox[1]))].append((int(obj.bbox[0]), sanitize(obj.get_text())))
             # if it's a container, recurse
             elif isinstance(obj, pdfminer.layout.LTFigure):
                 parse_obj(obj._objs, page)
@@ -149,14 +185,7 @@ def get_text_rows(path):
         yield (page, y, rows[key])
 
 
-def parse_row(row):
-    date, description, quantity = row
-    date = datetime.datetime.strptime(date, '%d/%m/%Y')
-    description = re.sub(' {2,}', ' - ', description)
-    quantity = -int(re.sub('[.,]', '', quantity))
-    return Transaction(
-        None,
-        date,
-        description,
-        quantity,
-    )
+def sanitize(text):
+    text = text.replace('\n', ' ')
+    text = text.strip()
+    return text

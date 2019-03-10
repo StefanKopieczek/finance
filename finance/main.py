@@ -42,10 +42,14 @@ def ingest_file():
     db.connect()
 
     if path.endswith('.csv'):
-        for tx in get_csv_transactions(path):
-            db.store_transaction(tx)
+        txs = get_csv_transactions(path)
     elif path.endswith('.pdf'):
-        get_pdf_transactions(path)
+        txs = get_pdf_transactions(path)
+    else:
+        raise ValueError("Unsupported file type")
+
+    for tx in txs:
+        db.store_transaction(tx)
 
 
 if __name__ == '__main__':
