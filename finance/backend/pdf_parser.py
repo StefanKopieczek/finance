@@ -57,7 +57,7 @@ def parse_transaction_row(row, header_columns):
     unparsed_columns = []
     for column, value in row:
         for col_type, col_type_x in enumerate(header_columns):
-            if abs(column - col_type_x) < 20:
+            if abs(column - col_type_x) < 30:
                 parsed_columns[col_type] = value
                 break
         else:
