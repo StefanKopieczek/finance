@@ -69,7 +69,7 @@ class Ui(object):
             self.input_win.move_cursor_left()
         elif c == curses.KEY_RIGHT:
             self.input_win.move_cursor_right()
-        elif c == curses.KEY_BACKSPACE:
+        elif c == curses.KEY_BACKSPACE or c == 127:
             self.input_win.backspace()
         elif c == curses.KEY_UP:
             for pane in self.view_panes:
@@ -86,8 +86,6 @@ class Ui(object):
             for pane in self.view_panes:
                 pane.reset_scroll()
             should_continue = self.handle_command(command)
-        else:
-            return False
 
         self.input_win.repaint()
         return should_continue
