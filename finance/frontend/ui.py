@@ -312,6 +312,7 @@ class ViewPane(object):
             self.write_line('Cannot parse command: {}'.format(command))
 
     def list_transactions(self, txs):
+        txs = sorted(txs, key=lambda tx: tx.timestamp)
         lines = list(format_transactions(txs))
         lines.append('--- {} transactions ---'.format(len(lines)))
         lines.append('')
