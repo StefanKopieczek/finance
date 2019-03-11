@@ -2,6 +2,7 @@ from curses import wrapper
 import datetime
 import logging.config
 import os
+import shutil
 import sys
 from getpass import getpass
 from .backend import Connection, Transaction, get_csv_transactions, get_pdf_transactions
@@ -15,6 +16,12 @@ def init_logging():
     log_file_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'logging.conf')
     logging.config.fileConfig(log_file_path, disable_existing_loggers=False)
     logger.info("Finance starting up - logging initialized")
+
+
+def back_up_db(dbfile):
+    db_backup = dbfile + '.bak'
+    logger.info("Backing up '%s' to '%s'", dbfile, db_backup)
+    shutil.copyfile(dbfile, db_backup)
 
 
 def add_test_data(db):
@@ -37,13 +44,15 @@ def add_test_data(db):
 
 def repl():
     init_logging()
-    logger.info("Starting REPL environment")
     db_file = sys.argv[1]
+    back_up_db(db_file)
     key = getpass('Password: ')
     db = Connection(db_file, key)
     db.connect()
     if len(db.as_view()) == 0:
+        logger.info("Adding test data to empty database")
         add_test_data(db)
+    logger.info("Starting REPL environment")
     ui = Ui(db)
     wrapper(ui.run)
 
@@ -51,6 +60,7 @@ def repl():
 def ingest_file():
     init_logging()
     db_file, path = sys.argv[1:]
+    back_up_db(db_file)
     logger.info("Starting file ingest for file at '%s'", path)
     key = getpass('Password: ')
     db = Connection(db_file, key)
