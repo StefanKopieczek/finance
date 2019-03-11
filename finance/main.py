@@ -1,9 +1,20 @@
 from curses import wrapper
 import datetime
+import logging.config
+import os
 import sys
 from getpass import getpass
 from .backend import Connection, Transaction, get_csv_transactions, get_pdf_transactions
 from .frontend import Ui
+
+
+logger = logging.getLogger(__name__)
+
+
+def init_logging():
+    log_file_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'logging.conf')
+    logging.config.fileConfig(log_file_path, disable_existing_loggers=False)
+    logger.info("Finance starting up - logging initialized")
 
 
 def add_test_data(db):
@@ -25,6 +36,8 @@ def add_test_data(db):
 
 
 def repl():
+    init_logging()
+    logger.info("Starting REPL environment")
     db_file = sys.argv[1]
     key = getpass('Password: ')
     db = Connection(db_file, key)
@@ -36,20 +49,27 @@ def repl():
 
 
 def ingest_file():
+    init_logging()
     db_file, path = sys.argv[1:]
+    logger.info("Starting file ingest for file at '%s'", path)
     key = getpass('Password: ')
     db = Connection(db_file, key)
     db.connect()
 
     if path.endswith('.csv'):
+        logger.info("Performing CSV import")
         txs = get_csv_transactions(path)
+        logger.info("Imported %d transactions", len(txs))
     elif path.endswith('.pdf'):
+        logger.info("Performing PDF import")
         txs = get_pdf_transactions(path)
+        logger.info("Imported %d transactions", len(txs))
     else:
         raise ValueError("Unsupported file type")
 
     for tx in txs:
         db.store_transaction(tx)
+    log.info("Stored %d transactions successfully", len(txs))
 
 
 if __name__ == '__main__':

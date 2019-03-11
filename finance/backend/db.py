@@ -1,8 +1,13 @@
 import datetime
 import hashlib
+import logging
 from .api import Transaction
 from contextlib import closing
 from pysqlcipher3 import dbapi2 as sqlcipher
+
+
+logger = logging.getLogger(__name__)
+query_logger = logging.getLogger(__name__ + 'query')
 
 
 _SCHEMA = (
@@ -29,6 +34,7 @@ class Connection(object):
         self._key = key
 
     def connect(self):
+        logger.info("Connecting to database at '%s'", self._path)
         self.db = sqlcipher.connect(self._path)
         self._do_crypto()
 
@@ -39,10 +45,14 @@ class Connection(object):
 
     def close(self):
         if self.db is not None:
+            logger.info("Closing database")
             self.db.close()
+        else:
+            logger.warn("Close called on uninitialized database")
 
     def _do_crypto(self):
         with self._safe_cursor() as c:
+            logger.debug("Setting up crypto")
             c.execute('pragma key="%s";' % self._key)
             c.execute('pragma kdf_iter=64000;')
 
@@ -56,12 +66,15 @@ class Connection(object):
             return False
 
     def _seed(self):
+        logger.info("Seeding database")
         with self._safe_cursor() as c:
             for table, cols in _SCHEMA:
                 col_descriptor = ','.join(('%s %s' % col for col in cols))
                 c.execute('CREATE TABLE %s (%s)' % (table, col_descriptor))
-            c.execute('INSERT INTO schema VALUES (?)', (self._schema_hash(),))
+            schema_version = self._schema_hash()
+            c.execute('INSERT INTO schema VALUES (?)', (schema_version,))
             self.db.commit()
+            logger.info("Seeded database with schema version %s", schema_version)
 
     def _schema_hash(self):
         m = hashlib.md5()
@@ -90,11 +103,13 @@ class Connection(object):
                 self.db.close()
 
     def _safe_cursor(self):
-        return closing(self.db.cursor())
+        return closing(LoggingProxy(self.db.cursor()))
 
     def store_transactions(self, txs):
+        logger.debug("Storing %d transactions", len(txs))
         for tx in txs:
             self.store_transaction(tx)
+        logger.info("Stored %d transactions", len(txs))
 
     def store_transaction(self, tx):
         if tx.tid is None:
@@ -145,7 +160,7 @@ class Connection(object):
                              category_1=?, category_2=?, category_3=?, notes=?
                          WHERE id=?""",
                       self._serialize_tx(tx) + (tx.tid,))
-            assert(c.rowcount == 1)
+            assert c.rowcount == 1, "Expected one row updated, got " + str(c.rowcount)
             self.db.commit()
 
     def _serialize_tx(self, tx):
@@ -252,6 +267,23 @@ def _datetime_to_epoch(dt):
 
 def _epoch_to_datetime(dt):
     return datetime.datetime.utcfromtimestamp(dt / 1000000)
+
+
+class LoggingProxy(object):
+    def __init__(self, delegate):
+        self.delegate = delegate
+
+    def __getattr__(self, attr):
+        delegate_f = getattr(self.delegate, attr)
+        if callable(delegate_f):
+            def f(*args, **kwargs):
+                query_logger.debug("DB call: args='%s', kwargs='%s'", args, kwargs)
+                res = delegate_f(*args, **kwargs)
+                return res
+            return f
+        else:
+            query_logger.debug("DB attribute '%s' is '%s'", attr, str(delegate_f))
+            return delegate_f
 
 
 if __name__ == '__main__':

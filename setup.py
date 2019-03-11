@@ -7,6 +7,10 @@ setup(name='finance',
       author='Stefan Kopieczek',
       license='LGPLv2',
       packages=['finance'],
+      package_data= {
+        "finance": [
+          "logging.conf"
+        ]},
       zip_safe=False,
       entry_points = {
           'console_scripts': [

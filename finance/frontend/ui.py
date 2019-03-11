@@ -1,8 +1,12 @@
 import curses
+import logging
 import textwrap
 import time
 from collections import defaultdict
 from ..backend import Filter
+
+
+logger = logging.getLogger(__name__)
 
 
 class Ui(object):
@@ -19,8 +23,10 @@ class Ui(object):
         self.init_ui()
         while self.handle_input():
             pass
+        logger.info("Exiting program")
 
     def init_ui(self):
+        logger.info("Initializing UI")
         self.screen.refresh()
         max_width = curses.COLS
         max_height = curses.LINES
@@ -91,9 +97,11 @@ class Ui(object):
         return should_continue
 
     def handle_command(self, command):
+        logger.info("Command given: '%s'", command)
         cmd = command.lower().strip()
         is_handled, continue_running = self.handle_global_command(cmd)
         if not is_handled:
+            logger.info("Delegating command to %d view panes (%s)", len(self.view_panes), command)
             for pane in self.view_panes:
                 pane.handle_command(cmd)
 
@@ -133,20 +141,25 @@ class InputPane(object):
         if self.cursor_pos >= 0:
             self.cursor_pos -= 1
         else:
+            logger.debug("Cursor left requested when cursor is already at leftmost point")
             curses.beep()
 
     def move_cursor_right(self):
         if self.cursor_pos < len(self.buffer):
             self.cursor_pos += 1
         else:
+            logger.debug("Cursor right requested when cursor is already at rightmost point")
             curses.beep()
 
     def backspace(self):
         if self.cursor_pos > 0:
             self.buffer = self.buffer[:self.cursor_pos - 1] + self.buffer[self.cursor_pos:]
             self.cursor_pos -= 1
+        else:
+            logger.debug("Cursor backspace requested when cursor is already at leftmost point")
 
     def flush_buffer(self):
+        logger.debug("Flushed buffer")
         flushed = self.buffer
         self.buffer = ''
         self.cursor_pos = 0
@@ -183,6 +196,7 @@ class ViewPane(object):
             self.window.refresh()
 
     def rebind(self, window):
+        logger.info("Rebinding ViewPane '%r' to window '%r'", self, window)
         if self.window is not None:
             self.window.clear()
             self.window.refresh()
@@ -210,6 +224,7 @@ class ViewPane(object):
         self.write_lines([line])
 
     def write_lines(self, lines):
+        logger.debug("Writing %d lines to ViewPane '%r'", len(lines), self)
         self.lines.extend(lines)
         if self.window is not None:
             for line in lines:
@@ -236,6 +251,8 @@ class ViewPane(object):
         if len(command) == 0:
             self.write_line(' ')
             return
+
+        logger.debug("ViewPane '%r' executing command '%s'", self, command)
 
         self.write_line('> {}'.format(command))
         if command == 'list':
