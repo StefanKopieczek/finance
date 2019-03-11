@@ -313,7 +313,7 @@ class ViewPane(object):
         elif command.startswith('filter \"') or command.startswith('filter \''):
             _, term = command.split(maxsplit=1)
             if len(term) == 1 or term[0] != term[-1]:
-                self.write_line('ERROR: Invalid term {}', term)
+                self.write_line('ERROR: Invalid term ' + term)
                 return
             else:
                 term = term[1:-1]
