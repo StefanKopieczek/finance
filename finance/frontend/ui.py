@@ -274,7 +274,9 @@ class ViewPane(object):
             tag = format_category(categories)
             if len(categories) < 3:
                 categories.extend([None] * (3 - len(categories)))
-            for tx in self.db_context:
+
+            txs = list(self.db_context)
+            for tx in txs:
                 tx.category_1, tx.category_2, tx.category_3 = categories
                 self.db_context.db.store_transaction(tx)
             self.write_line('Updated {} transactions'.format(count))
