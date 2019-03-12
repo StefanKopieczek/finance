@@ -124,7 +124,7 @@ class InputPane(object):
 
     def repaint(self):
         w = self.window
-        w.clear()
+        w.erase()
         w.border(' ', ' ', curses.ACS_HLINE, ' ')
         start = InputPane.INDENT
         w.addstr(1, start, '>', curses.A_BOLD)
@@ -179,7 +179,7 @@ class ViewPane(object):
     def repaint(self):
         if self.window is not None:
             height, _ = self.window.getmaxyx()
-            self.window.clear()
+            self.window.erase()
             self.window.border(0, 0, ' ', ' ')
             frame_start = self.scroll - height + 1
             frame_end = self.scroll
@@ -198,11 +198,11 @@ class ViewPane(object):
     def rebind(self, window):
         logger.info("Rebinding ViewPane '%r' to window '%r'", self, window)
         if self.window is not None:
-            self.window.clear()
+            self.window.erase()
             self.window.refresh()
 
         if window is not None:
-            window.clear()
+            window.erase()
 
         self.window = window
         lines = self.lines
