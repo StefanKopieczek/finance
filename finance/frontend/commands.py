@@ -120,7 +120,7 @@ def format_transaction(transaction):
 
     return (
         str(transaction.tid),
-        transaction.timestamp.strftime('%Y-%m-%d %H:%H'),
+        transaction.timestamp.strftime('%Y-%m-%d'),
         format_sum(transaction.amount_pence),
         transaction.description,
         category_string,
