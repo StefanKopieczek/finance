@@ -232,6 +232,9 @@ class ViewPane(object):
                 self.window.addstr(padding + idx, 2, line)
             self.window.refresh()
 
+    def get_max_content_width(self):
+        return self.window.getmaxyx()[1]
+
     def rebind(self, window):
         logger.info("Rebinding ViewPane '%r' to window '%r'", self, window)
         if self.window is not None:

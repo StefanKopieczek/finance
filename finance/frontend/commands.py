@@ -13,7 +13,7 @@ commands = None
 
 def _show_all(view):
     txs = sorted(view.db_context, key=lambda tx: tx.timestamp)
-    lines = list(format_transactions(txs))
+    lines = list(format_transactions(txs, max_width=view.get_max_content_width()))
     lines.append('--- {} transactions ---'.format(len(lines)))
     lines.append('')
     return lines
@@ -152,19 +152,23 @@ def format_transaction(transaction):
     )
 
 
-def format_transactions(txs):
+def format_transactions(txs, max_width=-1):
     if len(txs) == 0:
         return []
+
+    max_field_width = int(max_width / 4) if max_width > 0 else 9999999999
 
     tx_rows = [format_transaction(t) for t in txs]
     col_lengths = []
     for idx in range(len(tx_rows[0])):
-        col_lengths.append(max(len(row[idx]) for row in tx_rows))
+        col_lengths.append(min(max_field_width, max(len(row[idx]) for row in tx_rows)))
 
     results = []
     for row in tx_rows:
         padded_cols = []
         for idx, part in enumerate(row):
+            if len(part) > col_lengths[idx]:
+                part = part[:col_lengths[idx]-3] + '...'
             padded_cols.append(part.ljust(col_lengths[idx]))
         results.append('  '.join(padded_cols))
 
