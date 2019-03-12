@@ -1,8 +1,11 @@
 import curses
+import datetime
 import logging
 import textwrap
 import time
+from dateutil.relativedelta import relativedelta
 from .commands import commands
+from ..backend import Filter
 
 
 logger = logging.getLogger(__name__)
@@ -109,6 +112,24 @@ class Ui(object):
     def handle_global_command(self, command):
         if command == 'exit' or command == 'quit':
             return True, False
+        elif command.startswith('split month'):
+            if len(self.view_panes) > 1:
+                for pane in self.view_panes:
+                    pane.write_line("ERROR: You are already in a split. Call 'split reset' first")
+                return True, True
+            num_months = int(command.split()[-1])
+            latest_transaction = list(sorted(self.view_panes[0].db_context, key=lambda tx: tx.timestamp))[-1]
+            transaction_month = latest_transaction.timestamp.replace(day=1, hour=1, minute=1, second=1)
+            start_date = transaction_month - relativedelta(months=num_months)
+            end_date = start_date + relativedelta(months=1) - datetime.timedelta(days=1)
+            db_contexts = []
+            for _ in range(num_months):
+                start_date += relativedelta(months=1)
+                end_date += relativedelta(months=1)
+                db_context = self.view_panes[0].db_context.filter(Filter.date_range(start_date, end_date))
+                db_contexts.append(db_context)
+            self.refresh_view_panes(db_contexts)
+            return True, True
         else:
             return False, True
 
