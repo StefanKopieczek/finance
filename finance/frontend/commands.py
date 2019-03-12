@@ -1,3 +1,4 @@
+import datetime
 from collections import defaultdict
 from ..backend import Filter
 
@@ -59,13 +60,37 @@ def _filter_untagged(view):
     return get_filter_status(view.db_context)
 
 
-def _filter_tag(view, *tag):
+def _filter_tag(view, *tags):
     view.db_context = view.db_context.filter(Filter.category(tuple(tags)))
     return get_filter_status(view.db_context)
 
 
 def _filter_text(view, term):
     view.db_context = view.db_context.filter(Filter.description(term))
+    return get_filter_status(view.db_context)
+
+
+def _filter_date(view, *dates):
+    if len(dates) == 1:
+        start_date = dates[0]
+        end_date = start_date
+    else:
+        start_date, end_date = dates
+
+    start_date = parse_date(start_date)
+    end_date = parse_date(end_date) + datetime.timedelta(hours=23, minutes=59, seconds=59)
+    view.db_context = view.db_context.filter(Filter.date_range(start_date, end_date))
+    return get_filter_status(view.db_context)
+
+
+def _filter_date_before(view, end_date):
+    end_date = parse_date(end_date) + datetime.timedelta(hours=23, minutes=59, seconds=59)
+    view.db_context = view.db_context.filter(Filter.date_before(parse_date(end_date)))
+    return get_filter_status(view.db_context)
+
+
+def _filter_date_after(view, start_date):
+    view.db_context = view.db_context.filter(Filter.date_after(parse_date(start_date)))
     return get_filter_status(view.db_context)
 
 
@@ -146,6 +171,10 @@ def format_transactions(txs):
     return results
 
 
+def parse_date(date_str):
+    return datetime.datetime.strptime(date_str, '%Y-%m-%d')
+
+
 def format_sum(quantity):
     if quantity > 0:
         currency = '£'
@@ -190,6 +219,9 @@ class Commands(object):
         self.tag = Command(2, 5, _tag)
         self.filter_untagged = Command(0, 1, _filter_untagged)
         self.filter_tag = Command(1, 4, _filter_tag)
+        self.filter_date = Command(1, 3, _filter_date)
+        self.filter_date_before = Command(1, 2, _filter_date_before)
+        self.filter_date_after = Command(1, 2, _filter_date_after)
         self.filter_text = Command(1, 2, _filter_text)
         self.summary = Command(0, 1, _summary)
         self.reset = Command(0, 1, _reset)
