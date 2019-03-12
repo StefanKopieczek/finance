@@ -112,6 +112,9 @@ class Ui(object):
     def handle_global_command(self, command):
         if command == 'exit' or command == 'quit':
             return True, False
+        elif command == 'reset split':
+            self.refresh_view_panes([self.db.as_view()])
+            return True, True
         elif command.startswith('split month'):
             if len(self.view_panes) > 1:
                 for pane in self.view_panes:
