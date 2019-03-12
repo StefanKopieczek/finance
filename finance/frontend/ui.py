@@ -2,8 +2,7 @@ import curses
 import logging
 import textwrap
 import time
-from collections import defaultdict
-from ..backend import Filter
+from .commands import commands
 
 
 logger = logging.getLogger(__name__)
@@ -175,6 +174,20 @@ class ViewPane(object):
         self.max_scroll = 0
         self.db_context = db_context
         self.original_db_context = db_context
+        self.commands = self.register_commands()
+
+    def register_commands(self):
+        return {
+            'list': commands.show_all,
+            'tags': commands.list_tags,
+            'tag all': commands.tag_all,
+            'tag': commands.tag,
+            'filter untagged': commands.filter_untagged,
+            'filter tag': commands.filter_tag,
+            'filter': commands.filter_text,
+            'summary': commands.summary,
+            'reset': commands.reset,
+        }
 
     def repaint(self):
         if self.window is not None:
@@ -255,167 +268,15 @@ class ViewPane(object):
         logger.debug("ViewPane '%r' executing command '%s'", self, command)
 
         self.write_line('> {}'.format(command))
-        if command == 'list':
-            self.list_transactions(self.db_context)
-        elif command == 'tags':
-            tags = self.db_context.db.select_raw('''SELECT DISTINCT
-                                                    category_1, category_2, category_3
-                                                    FROM transactions''', tuple())
-            lines = sorted([format_category(tag) for tag in tags])
-            lines.append('')
-            self.write_lines(lines)
-        elif command.startswith('tag all'):
-            _, _, *categories = command.split() # noqa
-            if len(categories) > 3:
-                self.write_line('ERROR: At most 3 categories permitted')
-                return
-
-            count = len(self.db_context)
-            tag = format_category(categories)
-            if len(categories) < 3:
-                categories.extend([None] * (3 - len(categories)))
-
-            txs = list(self.db_context)
-            for tx in txs:
-                tx.category_1, tx.category_2, tx.category_3 = categories
-                self.db_context.db.store_transaction(tx)
-            self.write_line('Updated {} transactions'.format(count))
-        elif command.startswith('tag'):
-            parts = command.split()
-            if len(parts) == 1:
-                self.write_line('ERROR: Transaction ID required')
-                return
-
-            _, tid, *categories = parts # noqa
-            if len(categories) > 3:
-                self.write_line('ERROR: At most 3 categories permitted')
-                return
-
-            matches = list(self.db_context.db.fetch_transactions('id=?', (tid,)))
-            if len(matches) == 0:
-                self.write_line('ERROR: Transaction #{} not found'.format(tid))
-            else:
-                tx = matches[0]
-                if len(categories) < 3:
-                    categories.extend([None] * (3 - len(categories)))
-                tx.category_1, tx.category_2, tx.category_3 = categories
-                self.db_context.db.store_transaction(tx)
-        elif command == 'filter untagged':
-            self.db_context = self.db_context.filter(Filter.untagged())
-            self.print_filter_status()
-        elif command.startswith('filter tag'):
-            _, _, *tags = command.split()  # noqa
-            if len(tags) == 0 or len(tags) > 3:
-                self.write_line('ERROR: Must specify between one and three tags')
-                return
-            self.db_context = self.db_context.filter(Filter.category(tuple(tags)))
-            self.print_filter_status()
-        elif command.startswith('filter \"') or command.startswith('filter \''):
-            _, term = command.split(maxsplit=1)
-            if len(term) == 1 or term[0] != term[-1]:
-                self.write_line('ERROR: Invalid term ' + term)
-                return
-            else:
-                term = term[1:-1]
-                self.db_context = self.db_context.filter(Filter.description(term))
-                self.print_filter_status()
-        elif command == 'summary':
-            self.summary()
-        elif command == 'reset':
-            self.db_context = self.original_db_context
-            self.write_line('=> Showing {} total transactions'.format(len(self.db_context)))
-            self.write_line('')
+        for key, command_func in self.commands.items():
+            if command.startswith(key):
+                args_string = command[len(key):]
+                args = args_string.split()
+                output = command_func(self, *args)
+                self.write_lines(output)
+                break
         else:
             self.write_line('Cannot parse command: {}'.format(command))
-
-    def list_transactions(self, txs):
-        txs = sorted(txs, key=lambda tx: tx.timestamp)
-        lines = list(format_transactions(txs))
-        lines.append('--- {} transactions ---'.format(len(lines)))
-        lines.append('')
-        self.write_lines(lines)
-
-    def print_filter_status(self):
-        self.write_line('=> Filtered down to {} transactions'.format(len(self.db_context)))
-        self.write_line('')
-
-    def summary(self):
-        txs = list(self.db_context)
-        split_idx = 1
-        for field in ['category_1', 'category_2', 'category_3']:
-            distinct_values = set(getattr(tx, field) for tx in txs)
-            if len(distinct_values) > 1:
-                break
-            split_idx += 1
-
-        summary = defaultdict(int)
-        for tx in txs:
-            category = format_category([tx.category_1, tx.category_2, tx.category_3][:split_idx])
-            summary[category] += tx.amount_pence
-
-        category_size = max(len(c) for c in summary)
-        lines = []
-        for category in sorted(summary):
-            lines.append('{}  {}'.format(
-                category.ljust(category_size),
-                format_sum(summary[category]),
-            ))
-        lines.append('')
-        self.write_lines(lines)
-
-
-def format_category(category_tuple):
-    category_parts = []
-    for cat in category_tuple:
-        if cat is None:
-            break
-        else:
-            category_parts.append(cat)
-    category_string = ' > '.join(category_parts)
-    if len(category_string) == 0:
-        category_string = '[UNTAGGED]'
-    return category_string
-
-
-def format_transaction(transaction):
-    category_string = format_category((transaction.category_1, transaction.category_2, transaction.category_3))
-
-    return (
-        str(transaction.tid),
-        transaction.timestamp.strftime('%Y-%m-%d %H:%H'),
-        format_sum(transaction.amount_pence),
-        transaction.description,
-        category_string,
-    )
-
-
-def format_transactions(txs):
-    if len(txs) == 0:
-        return []
-
-    tx_rows = [format_transaction(t) for t in txs]
-    col_lengths = []
-    for idx in range(len(tx_rows[0])):
-        col_lengths.append(max(len(row[idx]) for row in tx_rows))
-
-    results = []
-    for row in tx_rows:
-        padded_cols = []
-        for idx, part in enumerate(row):
-            padded_cols.append(part.ljust(col_lengths[idx]))
-        results.append('  '.join(padded_cols))
-
-    return results
-
-
-def format_sum(quantity):
-    if quantity > 0:
-        currency = '£'
-    else:
-        currency = '-£'
-        quantity *= -1
-
-    return '{}{:.2f}'.format(currency, quantity / 100)
 
 
 if __name__ == '__main__':
