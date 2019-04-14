@@ -9,6 +9,11 @@ from pdfminer.pdfdevice import PDFDevice
 from pdfminer.layout import LAParams
 from pdfminer.converter import PDFPageAggregator
 import pdfminer
+import logging
+
+
+logger = logging.getLogger(__name__)
+HEADER_TOLERANCE = 20
 
 
 def get_pdf_transactions(path):
@@ -33,6 +38,8 @@ def extract_transactions_from_page(page, date_holder):
     for row in rows_iter:
         date, payment_type, details, paid_out, paid_in = parse_transaction_row(row, header_columns)
         if row_is_valid(date, payment_type, details, paid_out, paid_in):
+            logger.debug("Valid row: date:{}, type:{}, details:{}, in:{}, out:{}".format(
+                repr(date), repr(payment_type), repr(details), repr(paid_out), repr(paid_in)))
             if date is not None:
                 curr_date = date
             if details is not None:
@@ -47,6 +54,9 @@ def extract_transactions_from_page(page, date_holder):
                     raise ValueError("Date: " + repr(date) + ", details: " + repr(details))
                 yield Transaction(None, curr_date, curr_desc.strip(), -paid_in)
                 curr_desc = ''
+        else:
+            logger.debug("Invalid row: date:{}, type:{}, details:{}, in:{}, out:{}".format(
+                repr(date), repr(payment_type), repr(details), repr(paid_out), repr(paid_in)))
 
     date_holder[0] = curr_date
 
@@ -57,7 +67,7 @@ def parse_transaction_row(row, header_columns):
     unparsed_columns = []
     for column, value in row:
         for col_type, col_type_x in enumerate(header_columns):
-            if abs(column - col_type_x) < 30:
+            if abs(column - col_type_x) < HEADER_TOLERANCE:
                 parsed_columns[col_type] = value
                 break
         else:

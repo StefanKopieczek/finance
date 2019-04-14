@@ -68,18 +68,17 @@ def ingest_file():
 
     if path.endswith('.csv'):
         logger.info("Performing CSV import")
-        txs = get_csv_transactions(path)
-        logger.info("Imported %d transactions", len(txs))
+        txs = list(get_csv_transactions(path))
     elif path.endswith('.pdf'):
         logger.info("Performing PDF import")
-        txs = get_pdf_transactions(path)
-        logger.info("Imported %d transactions", len(txs))
+        txs = list(get_pdf_transactions(path))
     else:
         raise ValueError("Unsupported file type")
 
+    logger.info("Imported %d transactions", len(txs))
     for tx in txs:
         db.store_transaction(tx)
-    log.info("Stored %d transactions successfully", len(txs))
+    logger.info("Stored %d transactions successfully", len(txs))
 
 
 if __name__ == '__main__':
